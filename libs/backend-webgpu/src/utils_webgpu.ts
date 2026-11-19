@@ -201,6 +201,7 @@ export class WebGPUMipmapGenerator {
   static _mipmapGenerationStateSet: Nullable<WebGPURenderStateSet> = null;
   static _computeMipmapPrograms: Partial<Record<TextureFormat, WebGPUProgram>> = {};
   static _computeMipmapPrograms3D: Partial<Record<TextureFormat, WebGPUProgram>> = {};
+  static _computeMipmapProgramsLayers: Partial<Record<TextureFormat, WebGPUProgram>> = {};
   static getMipmapGenerationBindGroupLayout(device: WebGPUDevice) {
     if (!this._mipmapGenerationProgram) {
       this.initMipmapGeneration(device);
@@ -220,6 +221,9 @@ export class WebGPUMipmapGenerator {
   }
   static getComputeMipmapBindGroupLayout(device: WebGPUDevice, format: TextureFormat, is3D = false) {
     return this.getComputeMipmapProgram(device, format, is3D).bindGroupLayouts[0];
+  }
+  static getComputeMipmapLayersBindGroupLayout(device: WebGPUDevice, format: TextureFormat) {
+    return this.getComputeMipmapLayersProgram(device, format).bindGroupLayouts[0];
   }
   static generateMipmap(device: WebGPUDevice, tex: WebGPUBaseTexture, cmdEncoder?: GPUCommandEncoder) {
     const useCompute = tex.canGenerateMipmapWithCompute();
@@ -248,10 +252,10 @@ export class WebGPUMipmapGenerator {
     }
   }
   /**
-   * Compute counterpart of the raster path: one 8x8 dispatch per level and slice.
-   * Unlike the raster path, the whole chain is recorded into a single compute pass,
-   * so there is no per-level render pass begin/clear/end. Levels are the outer loop
-   * so the slices of one level carry no dependency on each other.
+   * Compute counterpart of the raster path, recorded into a single compute pass with no
+   * per-level render pass begin/clear/end. One 8x8 dispatch per level: the layers of an
+   * array texture and the faces of a cube are its third dimension, and the slices of a
+   * 3d level likewise.
    */
   private static generateMipmapCompute(
     device: WebGPUDevice,
@@ -260,7 +264,10 @@ export class WebGPUMipmapGenerator {
     numLayers: number
   ) {
     const is3D = tex.isTexture3D();
-    const program = this.getComputeMipmapProgram(device, tex.format, is3D);
+    const layered = tex.isTexture2DArray() || tex.isTextureCube();
+    const program = layered
+      ? this.getComputeMipmapLayersProgram(device, tex.format)
+      : this.getComputeMipmapProgram(device, tex.format, is3D);
     const pipeline = device.pipelineCache.fetchComputePipeline(program);
     if (!pipeline) {
       return;
@@ -271,16 +278,50 @@ export class WebGPUMipmapGenerator {
       const groupsX = Math.ceil(Math.max(tex.width >> level, 1) / COMPUTE_MIPMAP_GROUP_SIZE);
       const groupsY = Math.ceil(Math.max(tex.height >> level, 1) / COMPUTE_MIPMAP_GROUP_SIZE);
       // A 3d level is one dispatch over all its slices, see getComputeMipmapProgram()
-      const groupsZ = is3D ? Math.max(tex.depth >> level, 1) : 1;
-      for (let face = 0; face < numLayers; face++) {
-        const bindGroup = tex.getMipmapComputeBindGroup(level, face).bindGroup;
-        if (bindGroup) {
-          pass.setBindGroup(0, bindGroup);
-          pass.dispatchWorkgroups(groupsX, groupsY, groupsZ);
-        }
+      const groupsZ = layered ? numLayers : is3D ? Math.max(tex.depth >> level, 1) : 1;
+      const bindGroup = tex.getMipmapComputeBindGroup(level).bindGroup;
+      if (bindGroup) {
+        pass.setBindGroup(0, bindGroup);
+        pass.dispatchWorkgroups(groupsX, groupsY, groupsZ);
       }
     }
     pass.end();
+  }
+  /**
+   * Array counterpart of the 2d program: one invocation per destination texel of every
+   * layer, z running over the layers of an array texture or the faces of a cube.
+   */
+  private static getComputeMipmapLayersProgram(device: WebGPUDevice, format: TextureFormat) {
+    let program = this._computeMipmapProgramsLayers[format];
+    if (!program) {
+      const storageFormat = computeMipmapStorageFormats[format]!;
+      program = device.buildComputeProgram({
+        label: `MipmapGenerationCSLayers-${storageFormat}`,
+        workgroupSize: [COMPUTE_MIPMAP_GROUP_SIZE, COMPUTE_MIPMAP_GROUP_SIZE, 1],
+        compute(pb) {
+          this.srcTex = pb.tex2DArray().uniform(0);
+          this.dstTex = pb.texStorage2DArray[storageFormat]().storage(0);
+          pb.main(function () {
+            this.dstSize = pb.textureDimensions(this.dstTex);
+            this.$if(pb.all(pb.lessThan(this.$builtins.globalInvocationId.xy, this.dstSize)), function () {
+              this.uv = pb.div(
+                pb.add(pb.vec2(this.$builtins.globalInvocationId.xy), pb.vec2(0.5, 0.5)),
+                pb.vec2(this.dstSize)
+              );
+              this.layer = pb.int(this.$builtins.globalInvocationId.z);
+              pb.textureArrayStore(
+                this.dstTex,
+                this.$builtins.globalInvocationId.xy,
+                this.layer,
+                pb.textureArraySampleLevel(this.srcTex, this.uv, this.layer, 0)
+              );
+            });
+          });
+        }
+      }) as WebGPUProgram;
+      this._computeMipmapProgramsLayers[format] = program;
+    }
+    return program;
   }
   private static getComputeMipmapProgram(device: WebGPUDevice, format: TextureFormat, is3D = false) {
     if (is3D) {

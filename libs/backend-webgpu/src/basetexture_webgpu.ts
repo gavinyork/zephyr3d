@@ -52,7 +52,10 @@ export abstract class WebGPUBaseTexture<
   protected _samplerOptions: Nullable<RequireOptionals<SamplerOptions>>;
   protected _ringBuffer: UploadRingBuffer;
   protected _mipBindGroups: WebGPUBindGroup[][];
-  protected _mipComputeBindGroups: WebGPUBindGroup[][];
+  /** Per level, see getMipmapComputeBindGroup() */
+  protected _mipComputeBindGroups: WebGPUBindGroup[];
+  /** Per level: 2d-array view of all layers, see getLayersView() */
+  protected _layersViews: GPUTextureView[];
   protected _computeMipmap: boolean;
   protected _pendingUploads: (UploadTexture | UploadImage)[];
   constructor(device: WebGPUDevice, target: TextureType) {
@@ -72,6 +75,7 @@ export abstract class WebGPUBaseTexture<
     this._mipmapDirty = false;
     this._mipBindGroups = [];
     this._mipComputeBindGroups = [];
+    this._layersViews = [];
     this._computeMipmap = false;
     this._views = [];
     this._defaultView = null;
@@ -114,7 +118,11 @@ export abstract class WebGPUBaseTexture<
       const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
       if (options) {
         // Merge defaults with user options first
-        const merged = Object.assign({}, this._getSamplerOptions(params, !!options.compare), options);
+        const merged: RequireOptionals<SamplerOptions> = Object.assign(
+          {},
+          this._getSamplerOptions(params, !!options.compare),
+          options
+        );
         // Then compute maxAnisotropy based on the merged filter settings, unless explicitly set
         if (options.maxAnisotropy === undefined) {
           merged.maxAnisotropy =
@@ -178,24 +186,27 @@ export abstract class WebGPUBaseTexture<
         (this._object as GPUTexture).destroy();
       }
       this._object = null;
-      this._storageView = null;
       this._device.updateVideoMemoryCost(-this._memCost);
       this._memCost = 0;
       this._ringBuffer.purge();
-      this._views = [];
-      for (const face of this._mipBindGroups) {
-        for (const level of face) {
-          level?.dispose();
-        }
-      }
-      this._mipBindGroups = [];
-      for (const face of this._mipComputeBindGroups) {
-        for (const level of face) {
-          level?.dispose();
-        }
-      }
-      this._mipComputeBindGroups = [];
+      this.releaseViews();
     }
+  }
+  /** Drops the views of the texture object, and the mip generation bind groups made of them */
+  private releaseViews() {
+    this._storageView = null;
+    this._views = [];
+    this._layersViews = [];
+    for (const face of this._mipBindGroups) {
+      for (const level of face) {
+        level?.dispose();
+      }
+    }
+    this._mipBindGroups = [];
+    for (const level of this._mipComputeBindGroups) {
+      level?.dispose();
+    }
+    this._mipComputeBindGroups = [];
   }
   restore() {
     if (!this._object && !this._device.isContextLost()) {
@@ -247,6 +258,22 @@ export abstract class WebGPUBaseTexture<
   }
   getDefaultView() {
     return this._defaultView;
+  }
+  /** View of one mip level across all layers of an array texture, or the six faces of a cube, as a 2d-array */
+  getLayersView(level: number) {
+    let view = this._layersViews[level];
+    if (!view && this._object) {
+      view = this._device.gpuCreateTextureView(this._object as GPUTexture, {
+        dimension: '2d-array',
+        baseMipLevel: level,
+        mipLevelCount: 1,
+        baseArrayLayer: 0,
+        arrayLayerCount: this.isTextureCube() ? 6 : this._depth,
+        aspect: 'all'
+      });
+      this._layersViews[level] = view;
+    }
+    return view ?? null;
   }
   /**
    * View for binding as a storage texture: the default view restricted to the
@@ -451,14 +478,19 @@ export abstract class WebGPUBaseTexture<
     }
     if (
       this._object &&
-      (this._format !== format || this._width !== width || this._height !== height || this._depth !== depth,
-      this._mipLevelCount !== numMipLevels)
+      (this._format !== format ||
+        this._width !== width ||
+        this._height !== height ||
+        this._depth !== depth ||
+        this._mipLevelCount !== numMipLevels)
     ) {
       const obj = this._object;
+      this._device.gpuRemoveObjectHash(obj);
       this._device.runNextFrame(() => {
         (obj as GPUTexture).destroy();
       });
       this._object = null;
+      this.releaseViews();
     }
     if (!this._object) {
       this._format = format;
@@ -770,23 +802,29 @@ export abstract class WebGPUBaseTexture<
     }
     return levelGroup;
   }
-  getMipmapComputeBindGroup(level: number, face: number) {
-    const faceGroups = this._mipComputeBindGroups;
-    let levelGroups = faceGroups[face];
-    if (!levelGroups) {
-      levelGroups = [];
-      faceGroups[face] = levelGroups;
+  /**
+   * Bind group building mip level `level` from the one above in the compute path: of all
+   * layers of an array texture, or all faces of a cube, at once.
+   */
+  getMipmapComputeBindGroup(level: number) {
+    let bindGroup = this._mipComputeBindGroups[level];
+    if (!bindGroup) {
+      if (this._target === '2darray' || this._target === 'cube') {
+        bindGroup = this._device.createBindGroup(
+          WebGPUMipmapGenerator.getComputeMipmapLayersBindGroupLayout(this._device, this.format)
+        ) as WebGPUBindGroup;
+        bindGroup.setTextureLayersView('srcTex', this, level - 1);
+        bindGroup.setTextureLayersView('dstTex', this, level);
+      } else {
+        bindGroup = this._device.createBindGroup(
+          WebGPUMipmapGenerator.getComputeMipmapBindGroupLayout(this._device, this.format, this.isTexture3D())
+        ) as WebGPUBindGroup;
+        bindGroup.setTextureView('srcTex', this, level - 1, 0, 1);
+        bindGroup.setTextureView('dstTex', this, level, 0, 1);
+      }
+      this._mipComputeBindGroups[level] = bindGroup;
     }
-    let levelGroup = levelGroups[level];
-    if (!levelGroup) {
-      levelGroup = this._device.createBindGroup(
-        WebGPUMipmapGenerator.getComputeMipmapBindGroupLayout(this._device, this.format, this.isTexture3D())
-      ) as WebGPUBindGroup;
-      levelGroup.setTextureView('srcTex', this, level - 1, face, 1);
-      levelGroup.setTextureView('dstTex', this, level, face, 1);
-      levelGroups[level] = levelGroup;
-    }
-    return levelGroup;
+    return bindGroup;
   }
   /** @internal */
   protected _getSamplerOptions(params: Partial<TextureFormatInfoWebGPU>, shadow: boolean) {

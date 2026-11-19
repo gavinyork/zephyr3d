@@ -198,53 +198,78 @@ export class WebGPUBindGroup extends WebGPUObject<GPUObjectBase> implements Bind
   ) {
     if (!value) {
       throw new Error(`WebGPUBindGroup.setTextureView() failed: invalid texture uniform value: ${value}`);
-    } else {
-      const entry = this._findTextureLayout(name);
-      if (entry) {
-        if (entry.externalTexture) {
-          throw new Error(`WebGPUBindGroup.setTextureView() failed: video texture does not have view`);
-        } else if (value.isTextureVideo()) {
-          throw new Error(`WebGPUBindGroup.setTextureView() failed: invalid texture type`);
+    }
+    this._bindTextureView(
+      name,
+      value,
+      () => (value as WebGPUBaseTexture).getView(level, face, mipCount),
+      sampler
+    );
+  }
+  /**
+   * Binds one mip level of an array or cube texture across all its layers, as a
+   * 2d-array view.
+   * @internal
+   */
+  setTextureLayersView(name: string, value: BaseTexture, level: number, sampler?: Nullable<TextureSampler>) {
+    if (!value) {
+      throw new Error(
+        `WebGPUBindGroup.setTextureLayersView() failed: invalid texture uniform value: ${value}`
+      );
+    }
+    this._bindTextureView(name, value, () => (value as WebGPUBaseTexture).getLayersView(level), sampler);
+  }
+  private _bindTextureView(
+    name: string,
+    value: BaseTexture,
+    getView: () => Nullable<GPUTextureView>,
+    sampler?: Nullable<TextureSampler>
+  ) {
+    const entry = this._findTextureLayout(name);
+    if (entry) {
+      if (entry.externalTexture) {
+        throw new Error(`WebGPUBindGroup.setTextureView() failed: video texture does not have view`);
+      } else if (value.isTextureVideo()) {
+        throw new Error(`WebGPUBindGroup.setTextureView() failed: invalid texture type`);
+      }
+      const t = this._resources[name] as [WebGPUBaseTexture, GPUTextureView];
+      const view = getView();
+      if (!t || t[1] !== view) {
+        this._resources[name] = [value as WebGPUBaseTexture, view];
+        this.invalidate();
+      }
+      if (entry.texture?.autoBindSampler) {
+        const samplerEntry = this._findSamplerLayout(entry.texture.autoBindSampler);
+        if (!samplerEntry || !samplerEntry.sampler) {
+          throw new Error(
+            `WebGPUBindGroup.setTextureView() failed: sampler entry not found: ${entry.texture.autoBindSampler}`
+          );
         }
-        const t = this._resources[name] as [WebGPUBaseTexture, GPUTextureView];
-        const view = (value as WebGPUBaseTexture).getView(level, face, mipCount);
-        if (!t || t[1] !== view) {
-          this._resources[name] = [value as WebGPUBaseTexture, view];
+        const s = (
+          !sampler || sampler.compare ? value.getDefaultSampler(false) : sampler
+        ) as WebGPUTextureSampler;
+        if (s.object !== this._resources[entry.texture.autoBindSampler]) {
+          this._resources[entry.texture.autoBindSampler] = s.object!;
           this.invalidate();
         }
-        if (entry.texture?.autoBindSampler) {
-          const samplerEntry = this._findSamplerLayout(entry.texture.autoBindSampler);
-          if (!samplerEntry || !samplerEntry.sampler) {
-            throw new Error(
-              `WebGPUBindGroup.setTextureView() failed: sampler entry not found: ${entry.texture.autoBindSampler}`
-            );
-          }
-          const s = (
-            !sampler || sampler.compare ? value.getDefaultSampler(false) : sampler
-          ) as WebGPUTextureSampler;
-          if (s.object !== this._resources[entry.texture.autoBindSampler]) {
-            this._resources[entry.texture.autoBindSampler] = s.object!;
-            this.invalidate();
-          }
-        }
-        if (entry.texture?.autoBindSamplerComparison) {
-          const samplerEntry = this._findSamplerLayout(entry.texture.autoBindSamplerComparison);
-          if (!samplerEntry || !samplerEntry.sampler) {
-            throw new Error(
-              `WebGPUBindGroup.setTextureView() failed: sampler entry not found: ${entry.texture.autoBindSamplerComparison}`
-            );
-          }
-          const s = (
-            !sampler || !sampler.compare ? value.getDefaultSampler(true) : sampler
-          ) as WebGPUTextureSampler;
-          if (s.object !== this._resources[entry.texture.autoBindSamplerComparison]) {
-            this._resources[entry.texture.autoBindSamplerComparison] = s.object!;
-            this.invalidate();
-          }
-        }
-      } else {
-        throw new Error(`WebGPUBindGroup.setView() failed: no texture uniform named '${name}'`);
       }
+      if (entry.texture?.autoBindSamplerComparison) {
+        const samplerEntry = this._findSamplerLayout(entry.texture.autoBindSamplerComparison);
+        if (!samplerEntry || !samplerEntry.sampler) {
+          throw new Error(
+            `WebGPUBindGroup.setTextureView() failed: sampler entry not found: ${entry.texture.autoBindSamplerComparison}`
+          );
+        }
+        const s = (
+          !sampler || !sampler.compare ? value.getDefaultSampler(true) : sampler
+        ) as WebGPUTextureSampler;
+        if (s.object !== this._resources[entry.texture.autoBindSamplerComparison]) {
+          this._resources[entry.texture.autoBindSamplerComparison] = s.object!;
+          this.invalidate();
+        }
+      }
+    } else {
+      throw new Error(`WebGPUBindGroup.setView() failed: no texture uniform named '${name}'`);
     }
   }
   setTexture(name: string, value: BaseTexture | TextureVideo, sampler?: Nullable<TextureSampler>) {
@@ -291,7 +316,10 @@ export class WebGPUBindGroup extends WebGPUObject<GPUObjectBase> implements Bind
           if (!entry.externalTexture && !view) {
             throw new Error('WebGPUBindGroup.setTexture() failed: create texture view failed');
           }
-          if (!t || (t as [WebGPUBaseTexture, Nullable<GPUTextureView>])[0] !== value) {
+          // The view changes with the texture object, which a texture reallocates when
+          // its format, size or mip count changes
+          const bound = t as Nullable<[WebGPUBaseTexture, Nullable<GPUTextureView>]>;
+          if (!bound || bound[0] !== value || bound[1] !== view) {
             this._resources[name] = [value as WebGPUBaseTexture, view];
             this.invalidate();
           }
