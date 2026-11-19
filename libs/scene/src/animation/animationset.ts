@@ -1655,15 +1655,16 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
       }
     });
     if (this._gpuAnimation) {
+      const activeCount = this._activeAnimations.size;
       let clip: Nullable<AnimationClip> = null;
       let time = 0;
-      if (this._activeAnimations.size === 1) {
+      if (activeCount === 1) {
         const [[k, v]] = this._activeAnimations;
         clip = k;
         time = v.currentTime;
       }
       this._gpuDriver ??= new GpuAnimationDriver(this);
-      if (this._gpuDriver.update(clip, time)) {
+      if (this._gpuDriver.update(clip, time, activeCount === 0)) {
         // Bank tracks pose the skinned meshes: no joint node to pose, no palette to write
         this._timelineTickers.forEach((ticker) => ticker(deltaInSeconds));
         return;

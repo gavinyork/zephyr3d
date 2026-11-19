@@ -83,11 +83,18 @@ export class GpuAnimationDriver {
    *
    * @param clip - The only active clip, or null if none or more than one is active
    * @param time - Playback time of the clip
+   * @param idle - Whether no clip is active at all. Without a clip and not idle, several clips
+   *   are blended, which only the joint nodes can pose
    * @returns true if bank tracks pose the model, so the joints are not to be posed this frame
    */
-  update(clip: Nullable<AnimationClip>, time: number) {
+  update(clip: Nullable<AnimationClip>, time: number, idle: boolean) {
     if (!clip) {
-      return this.updateIdle();
+      if (idle) {
+        return this.updateIdle();
+      }
+      this._idleFrames = 0;
+      this.leave(true);
+      return false;
     }
     this._idleFrames = 0;
     const bindings = this.getClipBindings(clip);
