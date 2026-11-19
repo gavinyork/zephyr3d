@@ -115,6 +115,11 @@ export class PostSSS extends AbstractPostEffect {
   set profile(val: SSSProfile | null) {
     this._profile = val ?? null;
   }
+  /**
+   * Diffusion samples per pixel, 8 to 64. Default 64; fewer is cheaper and noisier.
+   *
+   * @public
+   */
   get sampleCount() {
     return this._sampleCount;
   }
@@ -475,6 +480,10 @@ export class PostSSS extends AbstractPostEffect {
               this.$l.acceptedCount = pb.float(0);
               this.$l.radiusSum = pb.float(0);
               this.$for(pb.int('i'), 0, DEFAULT_SAMPLE_COUNT, function () {
+                // The loop bound stays constant; sampleCount ends it early
+                this.$if(pb.greaterThanEqual(this.i, this.sampleCount), function () {
+                  this.$break();
+                });
                 this.$l.rand = this.r2Sequence(pb.add(this.seedStart, this.i));
                 this.$l.xi = pb.add(this.centerCdf, pb.mul(this.rand.x, pb.sub(1, this.centerCdf)));
                 this.$l.radiusMM = pb.max(this.radiusRootApprox(this.dForSampling, this.xi), 1e-5);
@@ -571,7 +580,7 @@ export class PostSSS extends AbstractPostEffect {
                   this.dbg = pb.vec3(
                     pb.div(
                       pb.mul(
-                        pb.div(this.radiusSum, DEFAULT_SAMPLE_COUNT),
+                        pb.div(this.radiusSum, pb.float(this.sampleCount)),
                         this.burleyScale.y,
                         this.targetSize.y
                       ),
@@ -583,7 +592,7 @@ export class PostSSS extends AbstractPostEffect {
                   this.dbg = this.weightAccum;
                 });
                 this.$if(pb.equal(this.debugMode, 8), function () {
-                  this.dbg = pb.vec3(pb.div(this.acceptedCount, DEFAULT_SAMPLE_COUNT));
+                  this.dbg = pb.vec3(pb.div(this.acceptedCount, pb.float(this.sampleCount)));
                 });
                 this.$if(pb.equal(this.debugMode, 9), function () {
                   this.dbg = this.centerWeight;
