@@ -28,6 +28,11 @@ All notable changes to Zephyr3D are documented in this file. Per-package changel
 - Faster water shading behind the depth prepass, fewer shore and waterline field rebuilds, cheaper
   virtual texture page marking and filling, and batched WebGPU buffer uploads.
 - Fixed `pickAsync` returning the hit point's x coordinate instead of the distance.
+- `ParticleSystem` fixes: particle rotation is drawn, particles at rest no longer vanish, textures
+  are no longer transposed on the quad, batches due within a frame all go out spread over it (a
+  moving emitter leaves an even trail), emitter shapes sample evenly with a circular cone spread,
+  culling bounds account for `scalar` and `aspect`, and changing `worldSpace` keeps live particles
+  in place.
 - Editor: road edit tool and road MCP tools, impostor baking from the asset browser, Mark/Diff in
   the device information window.
 - Build-time dependencies (`@rollup/plugin-commonjs`, `rollup-plugin-import-css`, `@types/node`)

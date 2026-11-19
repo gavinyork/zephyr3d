@@ -54,7 +54,7 @@ For text labels that stay crisp at any scale, use `MSDFTextSprite`; see [Text Re
 
 <<< @/../src/tut-90/main.js#particles
 
-**Emission rate**: `emitCount` particles are emitted every `emitInterval` milliseconds. But at most **one batch is emitted per frame**: when the interval is shorter than a frame, the missed batches are not made up, and the actual rate becomes "`emitCount` per frame", varying with the frame rate. For denser emission raise `emitCount` rather than pushing `emitInterval` below a frame. The example uses 6 every 40 milliseconds, which holds 150 per second at anything above 25 fps.
+**Emission rate**: `emitCount` particles are emitted every `emitInterval` milliseconds, whatever the frame rate. When the interval is shorter than a frame, every batch due within the frame goes out, each at its own time: earlier batches have already moved a little, and in world space they start where the emitter was at that moment. A fast-moving emitter therefore leaves a continuous trail instead of one clump per frame. After a stall, only the batches that could still be alive are made up. The example uses 6 every 40 milliseconds, 150 per second.
 
 **Particle limit**: `maxParticleCount` sizes the instance buffer and is also a hard limit: once it is reached, new particles are simply not created. Estimate it as "emission rate × longest life + burst size": the example's continuous flow keeps about 150 × 2.2 ≈ 330 alive, and 800 leaves room for two bursts of 200.
 
@@ -79,10 +79,11 @@ Common parameters and defaults:
 | `airResistence` | `false` | Whether the velocity eases towards `wind` |
 | `scalar` | `1` | Scales both the particles' movement and their birth size, to make a whole effect bigger or smaller |
 | `jitterSpeed` | `1` | Angular speed of the particle wobble (radians per second); its amplitude is the material's `jitterPower` |
+| `particleRotationMin` / `Max` | `0` / `0` | How fast particles turn in their own plane (radians per second). Particles are born upright, each picks a speed between the two, and negative speeds turn the other way |
 | `emitterShape` | `'point'` | See the table below |
 | `emitterBehavior` | `'surface'` | See the table below |
 | `emitterShapeSizeMin` / `Max` | `(1, 1, 1)` / `(1, 1, 1)` | Size of the emitter shape; each axis is picked at random between the two, per particle |
-| `emitterConeRadiusMin` / `Max` | `0` / `0.1` | How far the launch direction spreads away from +Y; only `point`, `box` and `cylinder` use it |
+| `emitterConeRadiusMin` / `Max` | `0` / `0.1` | How far the launch direction spreads away from +Y. For `point` and `box` the direction is (x, 1, z) normalized, with (x, z) spread evenly over the ring between radius Min and radius Max, so a Min above 0 gives a hollow cone; `cylinder` multiplies it by size Y for its vertical spread; the other shapes do not use it |
 | `worldSpace` | `true` | Whether particles live in world space or in the emitter's local space after birth; see below |
 
 Emitter shapes ("size" below is the value of `emitterShapeSize` picked between Min and Max):
@@ -105,7 +106,7 @@ The default material is `ParticleMaterial`, reached through `particles.material`
 
 | Property | Description |
 | --- | --- |
-| `alphaMap` | The particle's shape. **Only the red channel is read**, as opacity. It is data rather than colour, so it should be in a linear format |
+| `alphaMap` | The particle's shape. **Only the red channel is read**, as opacity. It is data rather than colour, so it should be in a linear format. The top of the texture is the top of the quad: up the screen, or along the direction of motion when `directional` is true |
 | `rampMap` | Colour over the particle's life: sampled with the normalized age (0 at birth, 1 at death) as U and V at 0. RGB is the colour and A multiplies the opacity, so fading in and out goes here too. It is a colour texture and should be in an sRGB format |
 | `blendMode` | `'blend'` (default) or `'additive'` |
 | `jitterPower` | How far particles wobble around their path, in the plane perpendicular to their velocity; the speed is set by `ParticleSystem.jitterSpeed` |
@@ -143,7 +144,7 @@ The example moves the emitter in its tick handler every frame:
 
 <<< @/../src/tut-90/main.js#worldspace
 
-Changing `worldSpace` at runtime does not convert the particles already alive: their coordinates are reinterpreted in the new space, so they jump once before they expire (toggle World space in the example to see it). Set it before emission starts.
+Changing `worldSpace` at runtime converts the particles already alive to the new space: they keep their position and velocity, then move in the new space. After switching to local space, for example, they follow the emitter around.
 
 ## Manual Bursts
 
@@ -175,8 +176,6 @@ Textures used by sprite and particle materials should have asset ids before seri
 
 ## Limitations and Pitfalls
 
-- **Particles with zero velocity are unreliable.** The shader normalizes the particle velocity to build the axes for the wobble and orientation; at zero velocity the result is undefined and the particle may simply disappear. Do not set `particleVelocityMin` to 0, and do not use a deceleration strong enough to stop particles within their life (with `gravity` or `wind` they generally do not stop).
-- **`particleRotationMin` / `Max` currently have no visible effect.** They are accumulated on the CPU, in radians per second, into a rotation angle per particle, but the `ParticleMaterial` shader does not use that value.
 - **Sprites only inherit their parent's translation.** The parent's rotation and scale do not apply to a sprite; its size and in-plane rotation come from its own transform alone.
 - Particles do not read scene depth (there are no soft particles), so they show hard edges where they cut into geometry; place large particles such as smoke with that in mind.
 

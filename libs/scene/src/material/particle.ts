@@ -155,10 +155,13 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    *
    * Responsibilities:
    * - Derives per-vertex billboard position in world space based on:
-   *   - particle position (`texCoord0`), params (`texCoord1`), and velocity (`texCoord2`).
+   *   - particle position (`texCoord0`), params (`texCoord1`: size, rotation, jitter angle,
+   *     normalized age), and velocity (`texCoord2`).
    *   - `params` uniform: x=jitter power, y=aspect scale, z=directional flag.
    * - Builds a right/up basis aligned with either view or velocity.
-   * - Computes UVs based on vertex ID (quad corners).
+   * - Rotates the quad in its plane by the particle rotation.
+   * - Computes UVs based on vertex ID (quad corners), the top edge of the quad showing the top of
+   *   the texture.
    * - Outputs `zUV`, `worldPos`, and `zParticleParams`.
    *
    * @param scope - Vertex shader function scope.
@@ -167,20 +170,6 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
-    pb.func('rotation2d', [pb.float('t'), pb.vec2('v')], function () {
-      this.$l.s = pb.sin(this.t);
-      this.$l.c = pb.cos(this.t);
-      this.$l.rc1 = pb.vec3(this.c, this.s, pb.mul(pb.sub(pb.sub(1, this.c), this.s), 0.5));
-      this.$l.rc2 = pb.vec3(pb.neg(this.s), this.c, pb.mul(pb.add(pb.sub(1, this.c), this.s), 0.5));
-      this.$l.uv = pb.vec3(this.v, 1);
-      this.$return(pb.vec2(pb.dot(this.rc1, this.uv), pb.dot(this.rc2, this.uv)));
-    });
-    pb.func('rotation3d', [pb.float('t'), pb.vec3('v')], function () {
-      this.$l.s = pb.sin(this.t);
-      this.$l.c = pb.cos(this.t);
-      this.$l.rot = pb.mat3(pb.vec3(this.c, pb.neg(this.s), 0), pb.vec3(this.s, this.c, 0), pb.vec3(0, 0, 1));
-      this.$return(pb.mul(this.rot, this.v));
-    });
     scope.$inputs.pos = pb.vec4().attrib('position');
     scope.$inputs.particlePos = pb.vec3().attrib('texCoord0');
     scope.$inputs.particleParams = pb.vec4().attrib('texCoord1');
@@ -188,8 +177,21 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
     scope.params = pb.vec4().uniform(2);
 
     scope.$l.vertexID = pb.int(scope.$inputs.pos.w);
-    scope.$l.z = pb.normalize(scope.$inputs.particleVelocity);
+    // Direction of motion, +Y for a particle at rest (normalizing a zero vector gives NaN)
+    scope.$l.speed = pb.length(scope.$inputs.particleVelocity);
+    scope.$l.z = scope.$choice(
+      pb.greaterThan(scope.speed, 1e-6),
+      pb.div(scope.$inputs.particleVelocity, pb.max(scope.speed, 1e-6)),
+      pb.vec3(0, 1, 0)
+    );
+    // Unit axes of the plane the particle jitters in, perpendicular to its direction of motion
     scope.$l.x = pb.vec3(pb.neg(scope.z.y), scope.z.x, 0);
+    scope.$l.xLength = pb.length(scope.x);
+    scope.x = scope.$choice(
+      pb.greaterThan(scope.xLength, 1e-6),
+      pb.div(scope.x, pb.max(scope.xLength, 1e-6)),
+      pb.vec3(1, 0, 0)
+    );
     scope.$l.y = pb.cross(scope.z, scope.x);
     scope.$l.offset = pb.add(
       pb.mul(pb.sin(scope.$inputs.particleParams.z), scope.x),
@@ -202,36 +204,52 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
     ).xyz;
     const viewMatrix = ShaderHelper.getViewMatrix(scope);
     scope.$l.forward = pb.vec3(viewMatrix[0].z, viewMatrix[1].z, viewMatrix[2].z);
-    scope.$l.axis = scope.$choice(
-      pb.notEqual(scope.params.z, 0),
-      scope.z,
-      scope.$choice(pb.lessThan(pb.abs(scope.forward.y), 0.999), pb.vec3(0, 1, 0), pb.vec3(1, 0, 0))
+    scope.$l.upAxis = scope.$choice(
+      pb.lessThan(pb.abs(scope.forward.y), 0.999),
+      pb.vec3(0, 1, 0),
+      pb.vec3(1, 0, 0)
     );
-    scope.$l.right = pb.normalize(pb.cross(scope.axis, scope.forward));
+    scope.$l.axis = scope.$choice(pb.notEqual(scope.params.z, 0), scope.z, scope.upAxis);
+    scope.$l.right = pb.cross(scope.axis, scope.forward);
+    scope.$l.rightLength = pb.length(scope.right);
+    // A directional particle moving along the view direction has no direction on screen: face the view
+    scope.right = scope.$choice(
+      pb.greaterThan(scope.rightLength, 1e-4),
+      pb.div(scope.right, pb.max(scope.rightLength, 1e-6)),
+      pb.normalize(pb.cross(scope.upAxis, scope.forward))
+    );
     scope.$l.up = pb.normalize(pb.cross(scope.forward, scope.right));
     scope.$l.pos = pb.vec2();
     scope.$l.uv = pb.vec2();
+    // V runs down the texture, so the bottom corners take V = 1
     scope
       .$if(pb.equal(scope.vertexID, 0), function () {
         scope.pos = pb.vec2(-0.5, -0.5);
-        scope.uv = pb.vec2(0, 0);
+        scope.uv = pb.vec2(0, 1);
       })
       .$elseif(pb.equal(scope.vertexID, 1), function () {
         scope.pos = pb.vec2(0.5, -0.5);
-        scope.uv = pb.vec2(0, 1);
+        scope.uv = pb.vec2(1, 1);
       })
       .$elseif(pb.equal(scope.vertexID, 2), function () {
         scope.pos = pb.vec2(-0.5, 0.5);
-        scope.uv = pb.vec2(1, 0);
+        scope.uv = pb.vec2(0, 0);
       })
       .$else(function () {
         scope.pos = pb.vec2(0.5, 0.5);
-        scope.uv = pb.vec2(1, 1);
+        scope.uv = pb.vec2(1, 0);
       });
-    scope.pos = pb.mul(scope.pos, scope.$inputs.particleParams.x);
+    // Width is size * aspect, height is size; the quad then turns counterclockwise by the rotation
+    scope.pos = pb.mul(scope.pos, pb.vec2(scope.params.y, 1), scope.$inputs.particleParams.x);
+    scope.$l.rotCos = pb.cos(scope.$inputs.particleParams.y);
+    scope.$l.rotSin = pb.sin(scope.$inputs.particleParams.y);
+    scope.pos = pb.vec2(
+      pb.sub(pb.mul(scope.pos.x, scope.rotCos), pb.mul(scope.pos.y, scope.rotSin)),
+      pb.add(pb.mul(scope.pos.x, scope.rotSin), pb.mul(scope.pos.y, scope.rotCos))
+    );
     scope.centerPosWS = pb.add(
       scope.centerPosWS,
-      pb.mul(scope.right, scope.pos.x, scope.params.y),
+      pb.mul(scope.right, scope.pos.x),
       pb.mul(scope.up, scope.pos.y)
     );
     scope.$outputs.zUV = scope.uv;

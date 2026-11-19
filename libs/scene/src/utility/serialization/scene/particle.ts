@@ -43,7 +43,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'EmitInterval',
-          description: 'Particle emit interval in millionseconds',
+          description: 'Particle emit interval in milliseconds',
           type: 'int',
           default: 100,
           get(this: ParticleSystem, value) {
@@ -211,7 +211,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Directional',
-          description: 'If true, emitted particles follow the emitter direction',
+          description: 'If true, particle quads are aligned with the direction of motion',
           type: 'bool',
           default: false,
           get(this: ParticleSystem, value) {
@@ -223,7 +223,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Rotation',
-          description: 'Min/Max value of particle rotation',
+          description: 'Min/Max rotation speed of particles in radians per second',
           type: 'vec2',
           default: [0, 0],
           options: {
