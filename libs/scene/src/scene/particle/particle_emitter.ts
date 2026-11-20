@@ -26,6 +26,9 @@ import {
   ParticleSimParams
 } from './particle_sim';
 import { ParticleWindow } from './particle_window';
+import { GpuParticleSim } from './particle_gpu';
+import { getDevice } from '../../app/api';
+import { warnUnsupported } from '../../utility/unsupported';
 
 /**
  * Where a particle emitter simulates
@@ -65,6 +68,7 @@ const MAX_FRAME_TIME = 0.1;
 const tmpVec3 = new Vector3();
 const tmpVec3b = new Vector3();
 const tmpVec3c = new Vector3();
+const tmpBox = new Float64Array(6);
 
 /**
  * A particle emitter: quads born from a shape, moved by forces, drawn with a
@@ -136,6 +140,11 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
   private readonly _lut: ParticleLUT;
   private readonly _params: ParticleSimParams;
   private _cpu: Nullable<CpuParticleSim>;
+  private _gpu: Nullable<GpuParticleSim>;
+  /** World bounds of the particles drawn, valid when _hasBounds */
+  private readonly _boundsMin: Float64Array;
+  private readonly _boundsMax: Float64Array;
+  private _hasBounds: boolean;
   private _numDraw: number;
   private _frameDelta: number;
   private _lateUpdateQueued: boolean;
@@ -181,6 +190,10 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     this._window = new ParticleWindow();
     this._params = new ParticleSimParams();
     this._cpu = null;
+    this._gpu = null;
+    this._boundsMin = new Float64Array(3);
+    this._boundsMax = new Float64Array(3);
+    this._hasBounds = false;
     this._numDraw = 0;
     this._frameDelta = 0;
     this._lateUpdateQueued = false;
@@ -229,7 +242,7 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
   }
   /** Where the emitter simulates now */
   get activeSimulation(): 'cpu' | 'gpu' {
-    return 'cpu';
+    return this.resolveBackend().gpu ? 'gpu' : 'cpu';
   }
   /** Space the particles live in. Changing it clears the particles. */
   get space() {
@@ -315,26 +328,49 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     this._window.clear();
     this._pendingEmit = 0;
     this._numDraw = 0;
+    this._hasBounds = false;
     this.invalidateBoundingVolume();
   }
-  /** Capacity of the CPU simulation */
-  private getCapacity() {
+  /** Which backend simulates, and with how many slots */
+  private resolveBackend(): { gpu: boolean; capacity: number } {
     const wantsGPU =
       this._simulation === 'gpu' ||
       (this._simulation === 'auto' && this._maxParticles >= ParticleEmitter.AUTO_GPU_THRESHOLD);
-    return wantsGPU
-      ? Math.min(this._maxParticles, Math.max(1, ParticleEmitter.cpuFallbackMaxParticles))
-      : this._maxParticles;
+    const device = getDevice();
+    if (wantsGPU && device.type === 'webgpu') {
+      // The instance buffer is the larger one and is bound whole as storage
+      const maxSlots = Math.floor(
+        device.getDeviceCaps().shaderCaps.maxStorageBufferSize / (PARTICLE_INSTANCE_FLOATS * 4)
+      );
+      return { gpu: true, capacity: Math.min(this._maxParticles, maxSlots) };
+    }
+    if (this._simulation === 'gpu') {
+      warnUnsupported(
+        "GPU particle simulation (ParticleEmitter.simulation 'gpu')",
+        'WebGPU',
+        `simulating on the CPU with at most ${ParticleEmitter.cpuFallbackMaxParticles} particles`
+      );
+    }
+    return {
+      gpu: false,
+      capacity: wantsGPU
+        ? Math.min(this._maxParticles, Math.max(1, ParticleEmitter.cpuFallbackMaxParticles))
+        : this._maxParticles
+    };
   }
-  /** (Re)creates the buffers for the capacity */
+  /** (Re)creates the simulation and the buffers for the backend and capacity */
   private ensureBuffers() {
-    const capacity = this.getCapacity();
-    if (this._cpu && this._cpu.capacity === capacity && this._primitive.get()) {
+    const { gpu, capacity } = this.resolveBackend();
+    const current = gpu ? this._gpu : this._cpu;
+    if (current && current.capacity === capacity && this._primitive.get()) {
       return;
     }
     this._window.clear();
     this._numDraw = 0;
-    this._cpu = new CpuParticleSim(capacity);
+    this._hasBounds = false;
+    this._gpu?.dispose();
+    this._gpu = null;
+    this._cpu = null;
     let primitive = this._primitive.get();
     if (!primitive) {
       primitive = new Primitive();
@@ -349,12 +385,18 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     } else {
       primitive.removeVertexBuffer('texCoord0');
     }
-    primitive.createAndSetVertexBuffer(
+    // Written by the compute shader on the GPU, uploaded every frame on the CPU
+    const instances = primitive.createAndSetVertexBuffer(
       ['tex0_f32x4', 'tex1_f32x4', 'tex2_f32x4', 'tex3_f32x4'],
       new Float32Array(capacity * PARTICLE_INSTANCE_FLOATS),
       'instance',
-      { dynamic: true }
+      gpu ? { storage: true } : { dynamic: true }
     );
+    if (gpu) {
+      this._gpu = new GpuParticleSim(capacity, instances);
+    } else {
+      this._cpu = new CpuParticleSim(capacity);
+    }
   }
   /**
    * {@inheritDoc SceneNode.update}
@@ -424,8 +466,7 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
    * @param output - Whether to write the instances and bounds
    */
   private step(dt: number, delta: Vector3, output: boolean) {
-    const cpu = this._cpu!;
-    const capacity = cpu.capacity;
+    const capacity = (this._gpu ?? this._cpu)!.capacity;
     const win = this._window;
     this._simTime += dt;
     win.expire(this._simTime);
@@ -458,18 +499,40 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
       spread = Math.min(spread, births);
     }
     const firstNew = win.end;
-    win.push(births, this._simTime + Math.max(this.start.lifetime.upper, 1e-3));
+    const lifeMax = Math.max(this.start.lifetime.upper, 1e-3);
+    const gpu = this._gpu;
+    if (gpu) {
+      // The GPU's particles are never read back: each batch keeps a box they cannot leave
+      win.push(births, this._simTime + lifeMax, this.getBatchBox(dt, delta, lifeMax));
+    } else {
+      win.push(births, this._simTime + lifeMax);
+    }
     this.fillParams(dt, delta, firstNew, spread);
-    cpu.step(this._params, this._lut, output);
-    if (output) {
-      this._numDraw = cpu.numInstances;
-      if (this._numDraw > 0) {
-        this._primitive
-          .get()!
-          .getVertexBuffer('texCoord0')!
-          .bufferSubData(0, cpu.instances, 0, this._numDraw * PARTICLE_INSTANCE_FLOATS);
+    if (gpu) {
+      gpu.step(this._params, this._lut);
+      if (output) {
+        this._numDraw = win.size;
+        this._hasBounds = this.getGpuBounds();
+        this.invalidateBoundingVolume();
       }
-      this.invalidateBoundingVolume();
+    } else {
+      const cpu = this._cpu!;
+      cpu.step(this._params, this._lut, output);
+      if (output) {
+        this._numDraw = cpu.numInstances;
+        if (this._numDraw > 0) {
+          this._primitive
+            .get()!
+            .getVertexBuffer('texCoord0')!
+            .bufferSubData(0, cpu.instances, 0, this._numDraw * PARTICLE_INSTANCE_FLOATS);
+          for (let i = 0; i < 3; i++) {
+            this._boundsMin[i] = cpu.boundsMin[i];
+            this._boundsMax[i] = cpu.boundsMax[i];
+          }
+        }
+        this._hasBounds = this._numDraw > 0;
+        this.invalidateBoundingVolume();
+      }
     }
     if (
       this._state === 'playing' &&
@@ -479,6 +542,101 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     ) {
       this._state = 'stopped';
     }
+  }
+  /** Largest scale of the emitter's axes */
+  private getScale() {
+    const m = this.worldMatrix;
+    return Math.max(
+      Math.hypot(m[0], m[1], m[2]),
+      Math.hypot(m[4], m[5], m[6]),
+      Math.hypot(m[8], m[9], m[10])
+    );
+  }
+  /**
+   * Speed no particle born now exceeds over its life, and how far the forces can take it beyond
+   * that, in world units
+   * @returns [speed bound, distance added by gravity over the life]
+   */
+  private getSpeedBound(dt: number, delta: Vector3, life: number): [number, number] {
+    const inherit =
+      this._space === 'world' && dt > 0
+        ? (Math.abs(this.inheritVelocity) * Math.hypot(delta.x, delta.y, delta.z)) / dt
+        : 0;
+    const air = this.forces.airVelocity;
+    const g = this.forces.gravity;
+    // Drag pulls toward the air's velocity, so the speed stays within the start speed plus
+    // twice the air's, plus what gravity adds
+    const speed = this.start.speed.maxAbs * this.getScale() + inherit + 2 * Math.hypot(air.x, air.y, air.z);
+    return [speed, 0.5 * Math.hypot(g.x, g.y, g.z) * life * life];
+  }
+  /**
+   * Box the particles born in this step stay in: in world space around where the emitter was
+   * over the step for world particles, around the emitter's origin for local ones
+   */
+  private getBatchBox(dt: number, delta: Vector3, life: number) {
+    const shape = this.shape;
+    let extent = 0;
+    switch (shape.type) {
+      case 'sphere':
+      case 'hemisphere':
+      case 'circle':
+      case 'cone':
+        extent = Math.abs(shape.radius);
+        break;
+      case 'box':
+        extent = 0.5 * Math.hypot(shape.boxSize.x, shape.boxSize.y, shape.boxSize.z);
+        break;
+      case 'edge':
+        extent = 0.5 * Math.abs(shape.length);
+        break;
+    }
+    const [speed, fall] = this.getSpeedBound(dt, delta, life);
+    const r = extent * this.getScale() + speed * life + fall;
+    if (this._space === 'world') {
+      const m = this.worldMatrix;
+      for (let i = 0; i < 3; i++) {
+        const p1 = m[12 + i];
+        const p0 = p1 - delta[i];
+        tmpBox[i] = Math.min(p0, p1) - r;
+        tmpBox[3 + i] = Math.max(p0, p1) + r;
+      }
+    } else {
+      tmpBox[0] = tmpBox[1] = tmpBox[2] = -r;
+      tmpBox[3] = tmpBox[4] = tmpBox[5] = r;
+    }
+    return tmpBox;
+  }
+  /** Conservative world bounds of the GPU's particles: their batches' boxes and the quads */
+  private getGpuBounds() {
+    if (!this._window.getBounds(tmpBox)) {
+      return false;
+    }
+    if (this._space === 'local') {
+      const m = this.worldMatrix;
+      for (let i = 0; i < 3; i++) {
+        tmpBox[i] += m[12 + i];
+        tmpBox[3 + i] += m[12 + i];
+      }
+    }
+    const size = this.start.size.maxAbs * this._lut.maxSize * this.getScale();
+    const width = size * Math.abs(this.start.aspect);
+    let reach = 0.5 * Math.hypot(width, size);
+    const p = this._params;
+    if (p.stretchLength > 0 || p.stretchSpeed > 0) {
+      const life = Math.max(this.start.lifetime.upper, 1e-3);
+      const [speed, fall] = this.getSpeedBound(
+        p.dt,
+        tmpVec3c.setXYZ(p.delta[0], p.delta[1], p.delta[2]),
+        life
+      );
+      // Gravity's speed at the end of the life is twice its average
+      reach = Math.hypot(width, size * p.stretchLength + (speed + (2 * fall) / life) * p.stretchSpeed);
+    }
+    for (let i = 0; i < 3; i++) {
+      this._boundsMin[i] = tmpBox[i] - reach;
+      this._boundsMax[i] = tmpBox[3 + i] + reach;
+    }
+    return true;
   }
   /**
    * Number of particles the bursts emit in the emission time [from, to)
@@ -524,7 +682,7 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     const worldSpace = this._space === 'world';
     const m = this.worldMatrix;
     p.dt = dt;
-    p.capacity = this._cpu!.capacity;
+    p.capacity = (this._gpu ?? this._cpu)!.capacity;
     p.windowStart = win.start;
     p.count = win.size;
     p.firstNew = firstNew;
@@ -608,10 +766,9 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
   /** World bounds of the particles, or a small box at the emitter when there are none */
   private getWorldBox() {
     const box = this._worldBox;
-    const cpu = this._cpu;
-    if (cpu && this._numDraw > 0) {
-      box.minPoint.setXYZ(cpu.boundsMin[0], cpu.boundsMin[1], cpu.boundsMin[2]);
-      box.maxPoint.setXYZ(cpu.boundsMax[0], cpu.boundsMax[1], cpu.boundsMax[2]);
+    if (this._hasBounds && this._numDraw > 0) {
+      box.minPoint.setXYZ(this._boundsMin[0], this._boundsMin[1], this._boundsMin[2]);
+      box.maxPoint.setXYZ(this._boundsMax[0], this._boundsMax[1], this._boundsMax[2]);
     } else {
       const m = this.worldMatrix;
       box.minPoint.setXYZ(m[12] - 0.5, m[13] - 0.5, m[14] - 0.5);
@@ -730,6 +887,8 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     super.onDispose();
     this._primitive.dispose();
     this._material.dispose();
+    this._gpu?.dispose();
+    this._gpu = null;
     this._cpu = null;
   }
 }

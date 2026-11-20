@@ -15,8 +15,11 @@ const tmp4 = new Float32Array(4);
 export class ParticleLUT {
   /** 128 vec4, the layout uploaded to the GPU */
   readonly data: Float32Array<ArrayBuffer>;
+  /** Increased by every bake */
+  version: number;
   constructor() {
     this.data = new Float32Array(PARTICLE_LUT_SIZE * 8);
+    this.version = 0;
     this.bake(null, null);
   }
   /**
@@ -25,6 +28,7 @@ export class ParticleLUT {
    * @param color - Color gradient, white if null
    */
   bake(size: Nullable<Interpolator>, color: Nullable<ParticleGradient>) {
+    this.version++;
     const data = this.data;
     const rgb = color?.rgb ?? null;
     const alpha = color?.alpha ?? null;

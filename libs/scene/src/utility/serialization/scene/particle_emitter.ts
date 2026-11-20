@@ -183,7 +183,7 @@ export function getParticleEmitterClass(): SerializableClass {
         {
           name: 'Simulation',
           description:
-            'Where particles are simulated; auto picks the GPU on WebGPU from 1000 particles. The GPU simulation is not available yet and runs on the CPU, with at most 20000 particles',
+            'Where particles are simulated; auto picks the GPU on WebGPU from 1000 particles. Without WebGPU the GPU choices run on the CPU with at most 20000 particles',
           type: 'string',
           default: 'auto',
           options: {
