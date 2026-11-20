@@ -17,6 +17,7 @@ import {
   RoadSpline,
   Water,
   ParticleSystem,
+  ParticleEmitter,
   BatchGroup,
   Sprite,
   TextSprite,
@@ -100,6 +101,7 @@ type NodeClass =
   | 'SpotLight'
   | 'RectLight'
   | 'ParticleSystem'
+  | 'ParticleEmitter'
   | 'Sprite';
 type MaterialClass =
   | 'UnlitMaterial'
@@ -559,6 +561,7 @@ const creatableNodeClasses: Record<string, new (scene: Scene) => SceneNode> = {
   RoadSpline,
   Water,
   ParticleSystem,
+  ParticleEmitter,
   BatchGroup,
   Sprite,
   TextSprite,
@@ -1037,6 +1040,8 @@ function getNodeClassName(node: SceneNode): NodeClass {
                   ? 'RectLight'
                   : node.isParticleSystem()
                     ? 'ParticleSystem'
+                    : node.isParticleEmitter()
+                      ? 'ParticleEmitter'
                     : node.isWater()
                       ? 'Water'
                       : node instanceof PerspectiveCamera
@@ -4055,6 +4060,7 @@ ${err.stack}`
         'SpotLight',
         'RectLight',
         'ParticleSystem',
+        'ParticleEmitter',
         'Sprite'
       ];
       return classes;

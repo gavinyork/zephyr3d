@@ -4,6 +4,7 @@ export * from './blinn';
 export * from './unlit';
 export * from './sdf_debug';
 export * from './particle';
+export * from './particlesprite';
 export * from './subsurfaceprofile';
 export * from './sssprofile';
 export * from './sss';

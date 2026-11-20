@@ -12,7 +12,7 @@ import type { Visitor } from '../scene/visitor';
 import type { Camera } from '../camera/camera';
 import type { SceneNode } from '../scene/scene_node';
 import type { BatchGroup } from '../scene/batchgroup';
-import type { MSDFText, MSDFTextSprite, ParticleSystem, Sprite } from '../scene';
+import type { MSDFText, MSDFTextSprite, ParticleEmitter, ParticleSystem, Sprite } from '../scene';
 import type { Water } from '../scene/water';
 import type { HairNode } from '../scene/hair';
 import { getDevice } from '../app/api';
@@ -129,6 +129,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       return this.visitHair(target);
     } else if (target.isParticleSystem()) {
       return this.visitParticleSystem(target);
+    } else if (target.isParticleEmitter()) {
+      return this.visitParticleEmitter(target);
     } else if (target.isClipmapTerrain()) {
       return this.visitClipmapTerrain(target);
     } else if (target.isPunctualLight()) {
@@ -182,6 +184,18 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   /** @internal */
   visitParticleSystem(node: ParticleSystem) {
+    if (!node.hidden && !this._isShadowMapping && (node.gpuPickable || !this._isGPUPicking)) {
+      const clipState = this.getClipStateWithNode(node);
+      if (clipState !== ClipState.NOT_CLIPPED) {
+        this.push(this._camera, node);
+        return true;
+      }
+    }
+    return false;
+  }
+  /** @internal */
+  visitParticleEmitter(node: ParticleEmitter) {
+    // Never in shadow maps, like the particle system
     if (!node.hidden && !this._isShadowMapping && (node.gpuPickable || !this._isGPUPicking)) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {

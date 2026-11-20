@@ -2279,7 +2279,7 @@ const BASE_TOOLS = [
   {
     name: 'node_create',
     description:
-      'Create a scene node in the current scene, the same way as the editor Add menu (undoable, default name, editor gizmo). Pass `class` to create a light (DirectionalLight, PointLight, SpotLight, RectLight), a camera (PerspectiveCamera, OrthoCamera), a ClipmapTerrain, a FoliageSystem (scattered trees/rocks; create it as a child of the terrain), Water, ParticleSystem, BatchGroup, a sprite/text node (Sprite, TextSprite, MSDFText, MSDFTextSprite) or a plain SceneNode group; configure it afterwards with node_get_property_list / node_set_properties. A new DirectionalLight becomes the sun light when the scene has none. Good lighting is essential for PBR materials to read well. Returns { node_id, name, err }.',
+      'Create a scene node in the current scene, the same way as the editor Add menu (undoable, default name, editor gizmo). Pass `class` to create a light (DirectionalLight, PointLight, SpotLight, RectLight), a camera (PerspectiveCamera, OrthoCamera), a ClipmapTerrain, a FoliageSystem (scattered trees/rocks; create it as a child of the terrain), Water, ParticleEmitter (particle effect; ParticleSystem is the legacy one), ParticleSystem, BatchGroup, a sprite/text node (Sprite, TextSprite, MSDFText, MSDFTextSprite) or a plain SceneNode group; configure it afterwards with node_get_property_list / node_set_properties. A new DirectionalLight becomes the sun light when the scene has none. Good lighting is essential for PBR materials to read well. Returns { node_id, name, err }.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2302,6 +2302,7 @@ const BASE_TOOLS = [
             'RoadSpline',
             'Water',
             'ParticleSystem',
+            'ParticleEmitter',
             'BatchGroup',
             'Sprite',
             'TextSprite',

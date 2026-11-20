@@ -17,6 +17,7 @@ export * from './octree';
 export * from './scene_node';
 export * from './physics_settings';
 export * from './particlesys';
+export * from './particle';
 export * from './batchgroup';
 export * from './scene';
 export * from './terrain-cm';

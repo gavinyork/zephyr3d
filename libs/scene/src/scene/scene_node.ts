@@ -17,6 +17,7 @@ import {
   Vector4
 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
+import type { ParticleEmitter } from './particle/particle_emitter';
 import type { SkeletonRig, SkinBinding } from '../animation';
 import type { GPUClothComponent } from '../animation/cloth/gpu_cloth_component';
 import type { NodePhysics } from '../physics/node_physics';
@@ -779,6 +780,10 @@ export class SceneNode
   }
   /** Type guard: true if this node is a particle system. */
   isParticleSystem(): this is ParticleSystem {
+    return false;
+  }
+  /** Type guard: true if this node is a particle emitter. */
+  isParticleEmitter(): this is ParticleEmitter {
     return false;
   }
   /** Type guard: true if this node is a batch group. */

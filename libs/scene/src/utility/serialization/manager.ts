@@ -54,6 +54,11 @@ import {
 import { getMeshClass } from './scene/mesh';
 import { getParticleNodeClass } from './scene/particle';
 import {
+  getParticleBurstClass,
+  getParticleEmitterClass,
+  getParticleSpriteMaterialClass
+} from './scene/particle_emitter';
+import {
   getBoxShapeClass,
   getBoxFrameShapeClass,
   getCapsuleShapeClass,
@@ -364,6 +369,8 @@ export class ResourceManager {
         getWaterInteractionClass(),
         getWaterDisturberClass(),
         getParticleNodeClass(),
+        getParticleEmitterClass(),
+        getParticleBurstClass(),
         getPunctualLightClass(),
         getDirectionalLightClass(),
         getSpotLightClass(),
@@ -390,6 +397,7 @@ export class ResourceManager {
         ...getPBRMetallicRoughnessMaterialClass(this),
         ...getPBRSpecularGlossinessMaterialClass(this),
         ...getParticleMaterialClass(this),
+        ...getParticleSpriteMaterialClass(this),
         ...getSpriteMaterialClass(this),
         ...getStandardSpriteMaterialClass(this),
 

@@ -17,6 +17,7 @@ import type {
 import {
   Mesh,
   ParticleSystem,
+  ParticleEmitter,
   PointLight,
   RectLight,
   Scene,
@@ -686,6 +687,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               label: 'Particle System',
               action: () => {
                 this.handleAddNode(ParticleSystem, 'Add particle system');
+                return true;
+              }
+            },
+            {
+              label: 'Particle Emitter',
+              action: () => {
+                this.handleAddNode(ParticleEmitter, 'Add particle emitter');
                 return true;
               }
             },

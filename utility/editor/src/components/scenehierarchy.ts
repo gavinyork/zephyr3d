@@ -9,6 +9,7 @@ import {
   RoadSpline,
   Mesh,
   ParticleSystem,
+  ParticleEmitter,
   SceneNode,
   Water
 } from '@zephyr3d/scene';
@@ -60,7 +61,7 @@ class SceneData extends TreeViewData<SceneNode> {
         emoj = '🌴';
       } else if (node instanceof RoadSpline) {
         emoj = '🛣️';
-      } else if (node instanceof ParticleSystem) {
+      } else if (node instanceof ParticleSystem || node instanceof ParticleEmitter) {
         emoj = '✨';
       } else if (node instanceof BaseLight) {
         emoj = '💡';
