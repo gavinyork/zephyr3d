@@ -6,6 +6,7 @@ import { CurveEditor } from './curveeditor';
 
 export class RampTextureCreator extends makeObservable(Disposable)<{
   preview_position: [{ key: number; value: number[] }];
+  ramp_changed: [];
 }>() {
   private readonly _textureWidth: number;
   private _texture: Texture2D;
@@ -93,6 +94,7 @@ export class RampTextureCreator extends makeObservable(Disposable)<{
   }
   private onAlphaChanged() {
     this.updateTexture();
+    this.dispatchEvent('ramp_changed');
   }
   private preview(data?: { key: number; value: number[] }) {
     if (data && !this._isDraggingIndicator) {
@@ -124,6 +126,7 @@ export class RampTextureCreator extends makeObservable(Disposable)<{
     }
     this.updateTexture();
     this._changed = changed;
+    this.dispatchEvent('ramp_changed');
   }
 
   // 新增：检查鼠标是否在指示器上

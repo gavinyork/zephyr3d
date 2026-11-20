@@ -18,6 +18,7 @@ import {
   Mesh,
   ParticleSystem,
   ParticleEmitter,
+  ParticleGradient,
   PointLight,
   RectLight,
   Scene,
@@ -48,8 +49,8 @@ import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import type { ToolBarItem } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
-import type { AABB, GenericConstructor, Interpolator, Nullable } from '@zephyr3d/base';
-import { mimeTypeOf, Vector4 } from '@zephyr3d/base';
+import type { AABB, GenericConstructor, Nullable } from '@zephyr3d/base';
+import { Interpolator, mimeTypeOf, Vector4 } from '@zephyr3d/base';
 import { DRef, HttpFS, PathUtils } from '@zephyr3d/base';
 import { ASSERT, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
@@ -143,6 +144,40 @@ type SyncedPropertyRecord = {
   newValue: PropertySnapshot;
 };
 
+/**
+ * A linear RGB curve the gradient dialog can edit: white for none, otherwise the first three
+ * channels of the curve at its keys
+ */
+function toRGBCurve(curve: Nullable<Interpolator>) {
+  const keys = curve && curve.inputs.length > 0 ? Array.from(curve.inputs) : [0, 1];
+  const outputs = new Float32Array(keys.length * 3).fill(1);
+  if (curve) {
+    const value = new Float32Array(curve.stride);
+    keys.forEach((t, i) => {
+      curve.interpolate(t, value);
+      for (let j = 0; j < 3; j++) {
+        outputs[i * 3 + j] = value[Math.min(j, value.length - 1)];
+      }
+    });
+  }
+  return new Interpolator('linear', 'vec3', new Float32Array(keys), outputs);
+}
+
+/** The alpha of an RGBA curve at its keys, or null if it has no alpha channel */
+function alphaOfCurve(curve: Nullable<Interpolator>) {
+  if (!curve || curve.stride < 4 || curve.inputs.length === 0) {
+    return null;
+  }
+  const keys = Array.from(curve.inputs);
+  const value = new Float32Array(curve.stride);
+  const outputs = new Float32Array(keys.length);
+  keys.forEach((t, i) => {
+    curve.interpolate(t, value);
+    outputs[i] = value[3];
+  });
+  return new Interpolator('linear', 'number', new Float32Array(keys), outputs);
+}
+
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
   private _postGizmoRenderer: Nullable<PostGizmoRenderer>;
@@ -202,7 +237,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cameraAnimationDuration: number;
   private _animatedCamera: Nullable<Camera>;
   private readonly _editingProps: Map<object, Map<PropertyAccessor, { id: string; value: number[] }>>;
-  private readonly _editingCurves: Map<Interpolator, string>;
+  /** Curves and gradients being edited, with their dialog ids */
+  private readonly _editingCurves: Map<Interpolator | ParticleGradient, string>;
   private _trackId: number;
   private _lastDuplicateTarget: 'scene' | 'asset';
   private _multiTransformItems: MultiTransformItem[];
@@ -1909,6 +1945,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
     this._propGrid.on('request_edit_curve1f', this.editCurve1f, this);
     this._propGrid.on('end_edit_curve1f', this.endEditCurve1f, this);
+    this._propGrid.on('request_edit_gradient', this.editGradient, this);
+    this._propGrid.on('end_edit_gradient', this.endEditGradient, this);
     this._propGrid.on('request_edit_track', this.editPropAnimation, this);
     this._propGrid.on('end_edit_track', this.endEditPropAnimation, this);
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
@@ -1944,6 +1982,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._propGrid.off('end_edit_aabb', this.endEditAABB, this);
     this._propGrid.off('request_edit_curve1f', this.editCurve1f, this);
     this._propGrid.off('end_edit_curve1f', this.endEditCurve1f, this);
+    this._propGrid.off('request_edit_gradient', this.editGradient, this);
+    this._propGrid.off('end_edit_gradient', this.endEditGradient, this);
     this._propGrid.off('request_edit_track', this.editPropAnimation, this);
     this._propGrid.off('end_edit_track', this.endEditPropAnimation, this);
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
@@ -2507,24 +2547,88 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
     }
   }
-  private editCurve1f(curve: Interpolator, name: string, apply: (curve: Interpolator) => void) {
-    let id = this._editingCurves.get(curve);
-    if (!id) {
-      id = `Edit curve: ${name}`;
-      this._editingCurves.set(curve, id);
+  /**
+   * Edits a curve property in place, assigning it again on every change so its owner sees it
+   * (a particle emitter bakes its curves when assigned). OK records one undo step back to a copy
+   * of the curve as it was; the dialog puts the curve back on cancel.
+   */
+  private editCurve1f(curve: Interpolator, name: string, object: object, prop: PropertyAccessor) {
+    if (this._editingCurves.has(curve)) {
+      ImGui.SetWindowFocus(this._editingCurves.get(curve)!);
+      return;
     }
-    Dialog.editCurve(id, curve).then((result) => {
-      this.endEditCurve1f(curve, result ? apply : null);
+    const id = `Edit curve: ${name}##EditCurve${this._trackId++}`;
+    this._editingCurves.set(curve, id);
+    const before = curve.clone();
+    const assign = (value: object) => prop.set?.call(object, { num: [], bool: [], str: [], object: [value] });
+    Dialog.editCurve(id, curve, undefined, undefined, undefined, () => assign(curve)).then((edited) => {
+      this._editingCurves.delete(curve);
+      if (edited) {
+        void this.handleObjectPropertyEditFinished(
+          object,
+          prop,
+          { num: [], bool: [], str: [], object: [before] },
+          { num: [], bool: [], str: [], object: [curve] }
+        );
+      }
     });
   }
-  private endEditCurve1f(curve: Interpolator, apply: Nullable<(curve: Interpolator) => void>) {
-    let id = this._editingCurves.get(curve);
+  private endEditCurve1f(curve: Interpolator) {
+    const id = this._editingCurves.get(curve);
     if (id) {
-      DialogRenderer.close(id, null);
+      DialogRenderer.close(id, false);
       this._editingCurves.delete(curve);
-      if (apply) {
-        apply(curve);
+    }
+  }
+  /**
+   * Edits a particle color gradient in place, as {@link SceneView.editCurve1f} does a curve: an RGB
+   * curve and an alpha curve over the normalized age
+   */
+  private editGradient(gradient: ParticleGradient, name: string, object: object, prop: PropertyAccessor) {
+    if (this._editingCurves.has(gradient)) {
+      ImGui.SetWindowFocus(this._editingCurves.get(gradient)!);
+      return;
+    }
+    const id = `Edit gradient: ${name}##EditGradient${this._trackId++}`;
+    this._editingCurves.set(gradient, id);
+    const before = new ParticleGradient(gradient.rgb?.clone() ?? null, gradient.alpha?.clone() ?? null);
+    const assign = (value: object) => prop.set?.call(object, { num: [], bool: [], str: [], object: [value] });
+    // The dialog edits a linear RGB curve and an alpha curve
+    if (!gradient.rgb || gradient.rgb.target !== 'vec3' || gradient.rgb.mode === 'cubicspline') {
+      gradient.rgb = toRGBCurve(gradient.rgb);
+    }
+    if (!gradient.alpha) {
+      // An RGBA curve keeps the alpha in its fourth channel
+      gradient.alpha = alphaOfCurve(before.rgb);
+    }
+    if (!gradient.alpha || gradient.alpha.mode === 'cubicspline') {
+      gradient.alpha = new Interpolator(
+        'linear',
+        'number',
+        new Float32Array([0, 1]),
+        new Float32Array([1, 1])
+      );
+    }
+    assign(gradient);
+    Dialog.editColorTrack(id, true, gradient.rgb, gradient.alpha, null, 600, 400, () =>
+      assign(gradient)
+    ).then((edited) => {
+      this._editingCurves.delete(gradient);
+      if (edited) {
+        void this.handleObjectPropertyEditFinished(
+          object,
+          prop,
+          { num: [], bool: [], str: [], object: [before] },
+          { num: [], bool: [], str: [], object: [gradient] }
+        );
       }
+    });
+  }
+  private endEditGradient(gradient: ParticleGradient) {
+    const id = this._editingCurves.get(gradient);
+    if (id) {
+      DialogRenderer.close(id, false);
+      this._editingCurves.delete(gradient);
     }
   }
   private editPropAnimation(track: PropertyTrack, target: object) {

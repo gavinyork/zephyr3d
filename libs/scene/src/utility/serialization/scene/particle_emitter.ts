@@ -48,21 +48,43 @@ function rangeProp(
   };
 }
 
-/** A curve property: kept in the scene file; edited in code for now */
+/** A flat curve of 1 over the normalized age */
+function constantCurve() {
+  return new InterpolatorClass('linear', 'number', new Float32Array([0, 1]), new Float32Array([1, 1]));
+}
+
+/** A white, opaque gradient, as the editor's gradient dialog edits it */
+function whiteGradient() {
+  return new ParticleGradient(
+    new InterpolatorClass('linear', 'vec3', new Float32Array([0, 1]), new Float32Array([1, 1, 1, 1, 1, 1])),
+    constantCurve()
+  );
+}
+
+/**
+ * A curve property kept in the scene file
+ * @param edit - Whether the editor shows it as a curve, otherwise it is hidden
+ */
 function curveProp(
   name: string,
   description: string,
   get: (node: ParticleEmitter) => Nullable<Interpolator>,
-  set: (node: ParticleEmitter, curve: Nullable<Interpolator>) => void
+  set: (node: ParticleEmitter, curve: Nullable<Interpolator>) => void,
+  edit = false
 ): PropertyAccessor<ParticleEmitter, 'DUMMY'> {
   return {
     name,
     description,
     type: 'object',
     default: null,
-    options: { group: 'Over Lifetime', objectTypes: [InterpolatorClass] },
+    options: edit
+      ? { group: 'Over Lifetime', objectTypes: [InterpolatorClass], edit: 'curve1f' }
+      : { group: 'Over Lifetime', objectTypes: [InterpolatorClass] },
     isHidden() {
-      return true;
+      return !edit;
+    },
+    create() {
+      return constantCurve();
     },
     isNullable() {
       return true;
@@ -79,6 +101,21 @@ function curveProp(
 
 function shapeUses(node: ParticleEmitter, ...types: ParticleShapeType[]) {
   return types.includes(node.shape.type);
+}
+
+/**
+ * The gradient over the life, for the editor only: the scene file keeps its RGB and alpha curves
+ * @internal
+ */
+export function getParticleGradientClass(): SerializableClass {
+  return {
+    ctor: ParticleGradient,
+    name: 'ParticleGradient',
+    noTitle: true,
+    getProps() {
+      return [];
+    }
+  };
 }
 
 /** @internal */
@@ -597,10 +634,36 @@ export function getParticleEmitterClass(): SerializableClass {
         // ---- Over Lifetime ----
         curveProp(
           'SizeOverLife',
-          'Size factor over the normalized age',
+          'Size factor over the normalized age (0 at birth, 1 at death); none for 1',
           (n) => n.overLife.size,
-          (n, c) => (n.overLife.size = c)
+          (n, c) => (n.overLife.size = c),
+          true
         ),
+        {
+          name: 'ColorOverLife',
+          description:
+            'Color and alpha factors over the normalized age (0 at birth, 1 at death), multiplying the start color; none for white',
+          type: 'object',
+          default: null,
+          options: { group: 'Over Lifetime', objectTypes: [ParticleGradient], edit: 'gradient' },
+          isPersistent() {
+            // Saved as ColorOverLifeRGB and ColorOverLifeAlpha
+            return false;
+          },
+          isNullable() {
+            return true;
+          },
+          create() {
+            return whiteGradient();
+          },
+          get(this: ParticleEmitter, value) {
+            value.object[0] = this.overLife.color;
+          },
+          set(this: ParticleEmitter, value) {
+            const gradient = value.object[0];
+            this.overLife.color = gradient instanceof ParticleGradient ? gradient : null;
+          }
+        },
         curveProp(
           'ColorOverLifeRGB',
           'Color factor over the normalized age',

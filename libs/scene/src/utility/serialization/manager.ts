@@ -56,6 +56,7 @@ import { getParticleNodeClass } from './scene/particle';
 import {
   getParticleBurstClass,
   getParticleEmitterClass,
+  getParticleGradientClass,
   getParticleSpriteMaterialClass
 } from './scene/particle_emitter';
 import {
@@ -371,6 +372,7 @@ export class ResourceManager {
         getParticleNodeClass(),
         getParticleEmitterClass(),
         getParticleBurstClass(),
+        getParticleGradientClass(),
         getPunctualLightClass(),
         getDirectionalLightClass(),
         getSpotLightClass(),

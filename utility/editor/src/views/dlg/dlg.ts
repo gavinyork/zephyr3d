@@ -187,9 +187,10 @@ export class Dialog {
     interpolator: Interpolator,
     onPreview?: (value: number[]) => void,
     width?: number,
-    height?: number
+    height?: number,
+    onChange?: () => void
   ): Promise<boolean> {
-    return DlgCurveEditor.editCurve(title, interpolator, onPreview, width, height);
+    return DlgCurveEditor.editCurve(title, interpolator, onPreview, width, height, onChange);
   }
   public static editColorTrack(
     title: string,
@@ -198,7 +199,8 @@ export class Dialog {
     alphaInterpolator: Interpolator,
     onPreview: (value: number[]) => void,
     width?: number,
-    height?: number
+    height?: number,
+    onChange?: () => void
   ) {
     return DlgEditColorTrack.editColorTrack(
       title,
@@ -207,7 +209,8 @@ export class Dialog {
       alphaInterpolator,
       onPreview,
       width,
-      height
+      height,
+      onChange
     );
   }
   public static async createRampTexture(

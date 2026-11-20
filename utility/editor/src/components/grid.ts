@@ -4,6 +4,7 @@ import {
   AnimationClip,
   Camera,
   getEngine,
+  ParticleGradient,
   PropertyTrack,
   Scene,
   SceneNode,
@@ -336,8 +337,10 @@ function isScriptArrayElementObject(value: unknown): value is {
 export class PropertyEditor extends Observable<{
   request_edit_aabb: [aabb: AABB];
   end_edit_aabb: [aabb: AABB];
-  request_edit_curve1f: [curve: Interpolator, name: string, apply: (curve: Interpolator) => void];
-  end_edit_curve1f: [curve: Interpolator, apply: Nullable<(curve: Interpolator) => void>];
+  request_edit_curve1f: [curve: Interpolator, name: string, object: object, prop: PropertyAccessor];
+  end_edit_curve1f: [curve: Interpolator];
+  request_edit_gradient: [gradient: ParticleGradient, name: string, object: object, prop: PropertyAccessor];
+  end_edit_gradient: [gradient: ParticleGradient];
   request_edit_track: [track: PropertyTrack, target: object];
   end_edit_track: [track: PropertyTrack, target: object, edited: boolean];
   object_property_changed: [object: Nullable<object>, prop: PropertyAccessor];
@@ -896,7 +899,8 @@ export class PropertyEditor extends Observable<{
         (group.value.object?.[0] instanceof PropertyTrack && group.prop.options?.edit === 'proptrack') ||
         (group.value.object?.[0] instanceof Interpolator &&
           group.value.object[0].target === 'number' &&
-          group.prop.options?.edit === 'curve1f');
+          group.prop.options?.edit === 'curve1f') ||
+        (group.value.object?.[0] instanceof ParticleGradient && group.prop.options?.edit === 'gradient');
       const settable =
         !group.prop.readonly &&
         !!group.prop.set &&
@@ -990,7 +994,9 @@ export class PropertyEditor extends Observable<{
                 if (group.prop.options?.edit === 'aabb') {
                   this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
                 } else if (group.prop.options?.edit === 'curve1f') {
-                  this.dispatchEvent('end_edit_curve1f', group.value.object[0] as Interpolator, null);
+                  this.dispatchEvent('end_edit_curve1f', group.value.object[0] as Interpolator);
+                } else if (group.prop.options?.edit === 'gradient') {
+                  this.dispatchEvent('end_edit_gradient', group.value.object[0] as ParticleGradient);
                 } else if (group.prop.options?.edit === 'proptrack') {
                   const animation: unknown = group.object;
                   ASSERT(
@@ -1022,8 +1028,16 @@ export class PropertyEditor extends Observable<{
                   'request_edit_curve1f',
                   group.value.object[0] as Interpolator,
                   group.name,
-                  (curve) =>
-                    group.prop.set.call(group.object, { num: [], bool: [], str: [], object: [curve] })
+                  group.object,
+                  group.prop
+                );
+              } else if (group.prop.options?.edit === 'gradient') {
+                this.dispatchEvent(
+                  'request_edit_gradient',
+                  group.value.object[0] as ParticleGradient,
+                  group.name,
+                  group.object,
+                  group.prop
                 );
               } else if (group.prop.options?.edit === 'proptrack') {
                 const animation: unknown = group.object;
@@ -1096,7 +1110,9 @@ export class PropertyEditor extends Observable<{
                 if (group.prop.options?.edit === 'aabb') {
                   this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
                 } else if (group.prop.options?.edit === 'curve1f') {
-                  this.dispatchEvent('end_edit_curve1f', group.value.object[0] as Interpolator, null);
+                  this.dispatchEvent('end_edit_curve1f', group.value.object[0] as Interpolator);
+                } else if (group.prop.options?.edit === 'gradient') {
+                  this.dispatchEvent('end_edit_gradient', group.value.object[0] as ParticleGradient);
                 } else if (group.prop.options?.edit === 'proptrack') {
                   const animation: unknown = group.object;
                   ASSERT(
@@ -1130,8 +1146,16 @@ export class PropertyEditor extends Observable<{
                   'request_edit_curve1f',
                   group.value.object[0] as Interpolator,
                   group.name,
-                  (curve) =>
-                    group.prop.set.call(group.object, { num: [], bool: [], str: [], object: [curve] })
+                  group.object,
+                  group.prop
+                );
+              } else if (group.prop.options?.edit === 'gradient') {
+                this.dispatchEvent(
+                  'request_edit_gradient',
+                  group.value.object[0] as ParticleGradient,
+                  group.name,
+                  group.object,
+                  group.prop
                 );
               } else if (group.prop.options?.edit === 'proptrack') {
                 const animation: unknown = group.object;

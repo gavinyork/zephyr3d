@@ -12,6 +12,7 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
   private readonly _savedAlphaInputs: InterpolateData;
   private readonly _savedAlphaOutputs: InterpolateData;
   private readonly _onPreview: (value: number[]) => void;
+  private readonly _onChange: () => void;
   constructor(
     id: string,
     useAlpha: boolean,
@@ -19,7 +20,8 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
     alphaInterpolator: Interpolator,
     onPreview: (value: number[]) => void,
     width: number,
-    height: number
+    height: number,
+    onChange?: () => void
   ) {
     super(id, width, height);
     this._creator = new RampTextureCreator(useAlpha, rgbInterpolator, alphaInterpolator);
@@ -30,7 +32,11 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
     this._savedAlphaInputs = alphaInterpolator ? alphaInterpolator.inputs.slice() : null;
     this._savedAlphaOutputs = alphaInterpolator ? alphaInterpolator.outputs.slice() : null;
     this._onPreview = onPreview;
+    this._onChange = onChange ?? null;
     this._creator.on('preview_position', this.preview, this);
+    if (this._onChange) {
+      this._creator.on('ramp_changed', this._onChange);
+    }
   }
   public static editColorTrack(
     title: string,
@@ -39,7 +45,8 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
     alphaInterpolator: Interpolator,
     onPreview: (value: number[]) => void,
     width?: number,
-    height?: number
+    height?: number,
+    onChange?: () => void
   ) {
     return new DlgEditColorTrack(
       title,
@@ -48,7 +55,8 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
       alphaInterpolator,
       onPreview,
       width,
-      height
+      height,
+      onChange
     ).show();
   }
   get rampTextureCreator() {
@@ -79,6 +87,7 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
         this._alphaInterpolator.inputs = this._savedAlphaInputs;
         this._alphaInterpolator.outputs = this._savedAlphaOutputs;
       }
+      this._onChange?.();
       this.close(false);
     }
   }
