@@ -433,6 +433,9 @@
     },
     "physics-drop": {
       "accepted": {
+        "linux-x64": [
+          "9d8b4ff0f1f9193f86ec1d73bb686d56"
+        ],
         "win32-x64": [
           "9d8b4ff0f1f9193f86ec1d73bb686d56"
         ]
@@ -452,6 +455,9 @@
     },
     "physics-mesh-ground": {
       "accepted": {
+        "linux-x64": [
+          "b452889922bd89d6a7aa7e70866d786e"
+        ],
         "win32-x64": [
           "b452889922bd89d6a7aa7e70866d786e"
         ]
@@ -912,7 +918,7 @@
     "transmission-rect-backlit": {
       "accepted": {
         "linux-x64": [
-          "6956711f8ea33461f9bdb7614065c004"
+          "54940d96983ab4bfed4624f9deaaac02"
         ],
         "win32-x64": [
           "6956711f8ea33461f9bdb7614065c004"
@@ -1066,10 +1072,10 @@
     "water-caustics-range-border": {
       "accepted": {
         "linux-x64": [
-          "98013fa940926284e1a2305ffb71ed19"
+          "6cc1fe74f4c042bbcdd824117bf70540"
         ],
         "win32-x64": [
-          "98013fa940926284e1a2305ffb71ed19"
+          "6cc1fe74f4c042bbcdd824117bf70540"
         ]
       },
       "size": 512
@@ -1165,10 +1171,10 @@
     "water-subsurface-backlit": {
       "accepted": {
         "linux-x64": [
-          "64d4a779d8add1c8146b36644f52154e"
+          "1723abc6cf3ab01549494dc2b0bd2c2b"
         ],
         "win32-x64": [
-          "64d4a779d8add1c8146b36644f52154e"
+          "1723abc6cf3ab01549494dc2b0bd2c2b"
         ]
       },
       "size": 512

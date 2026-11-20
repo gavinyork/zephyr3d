@@ -268,6 +268,9 @@
     },
     "physics-drop": {
       "accepted": {
+        "linux-x64": [
+          "9d8b4ff0f1f9193f86ec1d73bb686d56"
+        ],
         "win32-x64": [
           "9d8b4ff0f1f9193f86ec1d73bb686d56"
         ]
@@ -287,6 +290,9 @@
     },
     "physics-mesh-ground": {
       "accepted": {
+        "linux-x64": [
+          "30ae3e4d69c52439803f1d710707f8eb"
+        ],
         "win32-x64": [
           "30ae3e4d69c52439803f1d710707f8eb"
         ]
@@ -802,10 +808,10 @@
     "water-caustics-range-border": {
       "accepted": {
         "linux-x64": [
-          "9ef24b11a15632c959c5464990a2a8b0"
+          "89cd3f9ad0c778ccce4a6daab3e1c1d0"
         ],
         "win32-x64": [
-          "9ef24b11a15632c959c5464990a2a8b0"
+          "89cd3f9ad0c778ccce4a6daab3e1c1d0"
         ]
       },
       "size": 512
