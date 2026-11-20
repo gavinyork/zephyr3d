@@ -1,24 +1,52 @@
+import type { Nullable } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import type {
   BindGroup,
   GPUDataBuffer,
   GPUProgram,
   PBInsideFunctionScope,
+  PBShaderExp,
   StructuredBuffer
 } from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
+import type { GlobalSDF } from '../../render/sdf/global_sdf';
+import {
+  declareDynamicSDFUniforms,
+  declareGlobalSDFUniforms,
+  GLOBAL_SDF_LEVELS,
+  sampleSceneSDF
+} from '../../shaders/sdf';
+import { WindField } from '../wind';
 import type { ParticleLUT } from './particle_lut';
 import { PARTICLE_LUT_SIZE } from './particle_lut';
+import { particleCurlNoiseShader } from './particle_noise';
 import { ParticleChannel } from './particle_random';
 import type { ParticleSimParams } from './particle_sim';
-import { PARTICLE_INSTANCE_FLOATS, PARTICLE_SHAPE_IDS, PARTICLE_STATE_FLOATS } from './particle_sim';
+import {
+  PARTICLE_COLLISION_IDS,
+  PARTICLE_INSTANCE_FLOATS,
+  PARTICLE_SHAPE_IDS,
+  PARTICLE_STATE_FLOATS
+} from './particle_sim';
 
 /** Threads per workgroup */
 const WORKGROUP_SIZE = 64;
 /** Most workgroups along one dimension of a dispatch (the WebGPU default limit) */
 const MAX_GROUPS_X = 65535;
 /** vec4 of the float parameters, see GpuParticleSim.packParams */
-const PARAM_VEC4S = 16;
+const PARAM_VEC4S = 30;
+
+/** What a program of the simulation is compiled for */
+interface GpuSimVariant {
+  shapeType: number;
+  worldSpace: boolean;
+  noise: boolean;
+  wind: boolean;
+  /** See PARTICLE_COLLISION_IDS */
+  collision: number;
+  /** Levels of the global SDF, for SDF collision */
+  sdfLevels: number;
+}
 
 /**
  * What a channel adds to a particle's base hash, see particleRandom: the same wrapped product
@@ -85,15 +113,28 @@ export class GpuParticleSim {
    * Steps the window in one dispatch
    * @param p - Parameters
    * @param lut - Curves over the life
+   * @param sdf - Scene field for SDF collision, null if there is none
    */
-  step(p: ParticleSimParams, lut: ParticleLUT) {
+  step(p: ParticleSimParams, lut: ParticleLUT, sdf: Nullable<GlobalSDF>) {
     const count = p.count;
     if (count <= 0) {
       return;
     }
     const device = getDevice();
-    const key = `${p.shapeType}:${p.worldSpace ? 1 : 0}`;
-    const program = GpuParticleSim.getProgram(p.shapeType, p.worldSpace, key);
+    const collision =
+      p.collisionMode === PARTICLE_COLLISION_IDS.sdf && !sdf ? PARTICLE_COLLISION_IDS.none : p.collisionMode;
+    const variant: GpuSimVariant = {
+      shapeType: p.shapeType,
+      worldSpace: p.worldSpace,
+      noise: p.noiseStrength > 0,
+      wind: !!p.wind && (p.windScale[0] !== 0 || p.windScale[1] !== 0 || p.windScale[2] !== 0),
+      collision,
+      sdfLevels: collision === PARTICLE_COLLISION_IDS.sdf ? sdf!.levels : 0
+    };
+    const key = `${variant.shapeType}:${variant.worldSpace ? 1 : 0}:${variant.noise ? 1 : 0}:${
+      variant.wind ? 1 : 0
+    }:${variant.collision}:${variant.sdfLevels}`;
+    const program = GpuParticleSim.getProgram(variant, key);
     let bindGroup = this._bindGroup.get();
     if (!bindGroup || key !== this._programKey) {
       // A bind group per program: variants are not assumed to share a layout
@@ -124,6 +165,9 @@ export class GpuParticleSim {
       bindGroup.setValue('pLut', lut.data);
       this._lutVersion = lut.version;
     }
+    if (variant.collision === PARTICLE_COLLISION_IDS.sdf) {
+      sdf!.applyBindGroup(bindGroup);
+    }
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
     device.compute(groupsX, groupsY, 1);
@@ -152,12 +196,28 @@ export class GpuParticleSim {
     put(13, p.angularMin, p.angularMax, 0, 0);
     put(14, p.colorA[0], p.colorA[1], p.colorA[2], p.colorA[3]);
     put(15, p.colorB[0], p.colorB[1], p.colorB[2], p.colorB[3]);
+    put(16, p.noiseStrength, p.noiseFrequency, 0, 0);
+    const no = p.noiseOffset;
+    put(17, no[0], no[1], no[2], 0);
+    put(18, no[3], no[4], no[5], 0);
+    put(19, no[6], no[7], no[8], 0);
+    put(20, p.windScale[0], p.windScale[1], p.windScale[2], 0);
+    if (p.wind) {
+      // The current frame of the wind
+      f.set(p.wind.shaderParams.subarray(0, 16), 21 * 4);
+    }
+    put(25, p.plane[0], p.plane[1], p.plane[2], p.plane[3]);
+    put(26, p.bounce, p.friction, p.lifetimeLoss, p.radiusFactor);
+    const inv = p.invWorld;
+    put(27, inv[0], inv[1], inv[2], inv[12]);
+    put(28, inv[4], inv[5], inv[6], inv[13]);
+    put(29, inv[8], inv[9], inv[10], inv[14]);
   }
-  /** The program of a shape and space, built once and shared by every emitter */
-  private static getProgram(shapeType: number, worldSpace: boolean, key: string) {
+  /** The program of a variant, built once and shared by every emitter */
+  private static getProgram(variant: GpuSimVariant, key: string) {
     let program = this._programs.get(key);
     if (!program) {
-      program = buildProgram(shapeType, worldSpace);
+      program = buildProgram(variant);
       this._programs.set(key, program);
     }
     return program;
@@ -294,10 +354,109 @@ function sampleShape(scope: PBInsideFunctionScope, shapeType: number) {
   });
 }
 
-/** Builds the simulation program of a shape and space */
-function buildProgram(shapeType: number, worldSpace: boolean): GPUProgram {
-  const program = getDevice().buildComputeProgram({
-    label: `ParticleSim${shapeType}${worldSpace ? 'W' : 'L'}`,
+/** Size factor of the curve at a normalized age, linear between the samples */
+function lutSize(scope: PBInsideFunctionScope, a: PBShaderExp) {
+  const pb = scope.$builder;
+  pb.func('pLutSize', [pb.float('a')], function () {
+    this.$l.x = pb.mul(this.a, PARTICLE_LUT_SIZE - 1);
+    this.$l.fl = pb.floor(this.x);
+    this.$l.j0 = pb.uint(this.fl);
+    this.$l.j1 = pb.min(pb.add(this.j0, 1), pb.uint(PARTICLE_LUT_SIZE - 1));
+    this.$return(
+      pb.mix(
+        this.pLut.at(pb.add(this.j0, PARTICLE_LUT_SIZE)).x,
+        this.pLut.at(pb.add(this.j1, PARTICLE_LUT_SIZE)).x,
+        pb.sub(this.x, this.fl)
+      )
+    );
+  });
+  return pb.getGlobalScope().pLutSize(a) as PBShaderExp;
+}
+
+/** A point of the emitter's space in world space, using m0..m3 of the scope */
+function toWorld(scope: PBInsideFunctionScope, p: PBShaderExp) {
+  const pb = scope.$builder;
+  return pb.add(pb.mul(scope.m0, p.x), pb.mul(scope.m1, p.y), pb.mul(scope.m2, p.z), scope.m3);
+}
+
+/** A vector of the emitter's space in world space, using m0..m2 of the scope */
+function toWorldVector(scope: PBInsideFunctionScope, v: PBShaderExp) {
+  const pb = scope.$builder;
+  return pb.add(pb.mul(scope.m0, v.x), pb.mul(scope.m1, v.y), pb.mul(scope.m2, v.z));
+}
+
+/**
+ * Collides the particle's sphere with the scene's field, in world space: npos, nvel and nage of
+ * the scope are the particle after the step, r its radius in simulation units
+ */
+function collideSDF(scope: PBInsideFunctionScope, worldSpace: boolean, levels: number) {
+  const pb = scope.$builder;
+  scope.$l.wp = worldSpace ? scope.npos : toWorld(scope, scope.npos);
+  scope.$l.rw = worldSpace ? scope.r : pb.mul(scope.r, scope.pParams.at(6).w);
+  scope.$l.sd = sampleSceneSDF(scope, scope.wp, levels);
+  scope.$if(pb.lessThan(scope.sd, scope.rw), function () {
+    // Normal from the field's gradient, four samples on a tetrahedron half a finest voxel across
+    this.$l.e = pb.mul(this[GLOBAL_SDF_LEVELS].at(0).w, 0.5);
+    this.$l.grad = pb.vec3(0);
+    for (const k of [
+      [1, -1, -1],
+      [-1, -1, 1],
+      [-1, 1, -1],
+      [1, 1, 1]
+    ]) {
+      const dir = pb.vec3(k[0], k[1], k[2]);
+      this.grad = pb.add(
+        this.grad,
+        pb.mul(dir, sampleSceneSDF(this, pb.add(this.wp, pb.mul(dir, this.e)), levels))
+      );
+    }
+    this.$l.glen = pb.length(this.grad);
+    this.$l.n = this.$choice(
+      pb.greaterThan(this.glen, 1e-6),
+      pb.div(this.grad, pb.max(this.glen, 1e-6)),
+      pb.vec3(0, 1, 0)
+    );
+    this.$l.vw = worldSpace ? this.nvel : toWorldVector(this, this.nvel);
+    // Out of the surface, but no farther than it could have gone in this step
+    this.$l.out = pb.min(pb.sub(this.rw, this.sd), pb.add(this.rw, pb.mul(pb.length(this.vw), this.stepDt)));
+    this.wp = pb.add(this.wp, pb.mul(this.n, this.out));
+    this.$l.vn = pb.dot(this.vw, this.n);
+    this.$if(pb.lessThan(this.vn, 0), function () {
+      this.$l.pc = this.pParams.at(26);
+      this.vw = pb.sub(
+        pb.mul(pb.sub(this.vw, pb.mul(this.n, this.vn)), pb.sub(1, this.pc.y)),
+        pb.mul(this.n, this.vn, this.pc.x)
+      );
+      this.nage = pb.add(this.nage, pb.mul(this.pc.z, this.s1.w));
+    });
+    if (worldSpace) {
+      this.npos = this.wp;
+      this.nvel = this.vw;
+    } else {
+      this.$l.i0 = this.pParams.at(27);
+      this.$l.i1 = this.pParams.at(28);
+      this.$l.i2 = this.pParams.at(29);
+      this.npos = pb.add(
+        pb.mul(this.i0.xyz, this.wp.x),
+        pb.mul(this.i1.xyz, this.wp.y),
+        pb.mul(this.i2.xyz, this.wp.z),
+        pb.vec3(this.i0.w, this.i1.w, this.i2.w)
+      );
+      this.nvel = pb.add(
+        pb.mul(this.i0.xyz, this.vw.x),
+        pb.mul(this.i1.xyz, this.vw.y),
+        pb.mul(this.i2.xyz, this.vw.z)
+      );
+    }
+  });
+}
+
+/** Builds the simulation program of a variant */
+function buildProgram(variant: GpuSimVariant): GPUProgram {
+  const { shapeType, worldSpace, noise, wind, collision, sdfLevels } = variant;
+  const device = getDevice();
+  const program = device.buildComputeProgram({
+    label: `ParticleSim${shapeType}${worldSpace ? 'W' : 'L'}${noise ? 'N' : ''}${wind ? 'A' : ''}C${collision}`,
     workgroupSize: [WORKGROUP_SIZE, 1, 1],
     compute(pb) {
       this.pInts = pb.uvec4[3]().uniform(0);
@@ -305,11 +464,18 @@ function buildProgram(shapeType: number, worldSpace: boolean): GPUProgram {
       // 7: (air, aspect); 8: (radius, thickness, angle, arc); 9: (box half size, edge length);
       // 10: (randomize direction, 0, 0, 0); 11: (life min, max, speed min, max);
       // 12: (size min, max, rotation min, max); 13: (angular velocity min, max, 0, 0);
-      // 14: color A; 15: color B
+      // 14: color A; 15: color B; 16: (noise strength, frequency, 0, 0); 17-19: noise offsets;
+      // 20: (wind scale, 0); 21-24: wind of this frame; 25: plane (normal, distance);
+      // 26: (bounce, friction, lifetime loss, radius factor); 27-29: inverse world matrix
+      // columns, with its translation in w
       this.pParams = pb.vec4[PARAM_VEC4S]().uniform(0);
       this.pLut = pb.vec4[PARTICLE_LUT_SIZE * 2]().uniform(0);
       this.pState = pb.vec4[0]().storageBuffer(0);
       this.pInstances = pb.vec4[0]().storageBuffer(0);
+      if (collision === PARTICLE_COLLISION_IDS.sdf) {
+        declareGlobalSDFUniforms(this, 0, sdfLevels);
+        declareDynamicSDFUniforms(this, 0);
+      }
       // lowbias32, unsigned arithmetic wrapping like Math.imul, see particleHash
       pb.func('pHash', [pb.uint('v')], function () {
         this.$l.x = this.v;
@@ -390,16 +556,80 @@ function buildProgram(shapeType: number, worldSpace: boolean): GPUProgram {
           this.stepDt = pb.mul(pb.sub(1, this.f), this.dt);
         });
         this.$if(pb.lessThan(this.s0.w, this.s1.w), function () {
-          // Integrate: forces, then drag toward the air, then move
-          this.$l.p6 = this.pParams.at(6);
-          this.$l.p7 = this.pParams.at(7);
-          this.$l.nvel = pb.add(this.s1.xyz, pb.mul(this.p6.xyz, this.stepDt));
+          // Accelerations: gravity and the curl noise where the particle is
+          this.$l.accel = this.pParams.at(6).xyz;
+          if (noise) {
+            this.$l.pn = this.pParams.at(16);
+            this.accel = pb.add(
+              this.accel,
+              pb.mul(
+                particleCurlNoiseShader(
+                  this,
+                  pb.mul(this.s0.xyz, this.pn.y),
+                  this.pParams.at(17).xyz,
+                  this.pParams.at(18).xyz,
+                  this.pParams.at(19).xyz
+                ),
+                this.pn.x
+              )
+            );
+          }
+          this.$l.nvel = pb.add(this.s1.xyz, pb.mul(this.accel, this.stepDt));
+          // Drag toward the air, with the scene's wind where the particle is
+          this.$l.air = this.pParams.at(7).xyz;
+          if (wind) {
+            this.$l.wpos = worldSpace ? this.s0.xyz : toWorld(this, this.s0.xyz);
+            this.air = pb.add(
+              this.air,
+              pb.mul(
+                this.pParams.at(20).xyz,
+                WindField.shaderPush(
+                  this,
+                  this.wpos.xz,
+                  this.pParams.at(21),
+                  this.pParams.at(22),
+                  this.pParams.at(23),
+                  this.pParams.at(24)
+                )
+              )
+            );
+          }
           this.$l.decay = pb.exp(pb.mul(pb.neg(this.pParams.at(5).w), this.stepDt));
-          this.nvel = pb.add(this.p7.xyz, pb.mul(pb.sub(this.nvel, this.p7.xyz), this.decay));
-          this.s0 = pb.vec4(
-            pb.add(this.s0.xyz, pb.mul(this.nvel, this.stepDt)),
-            pb.add(this.s0.w, this.stepDt)
-          );
+          this.nvel = pb.add(this.air, pb.mul(pb.sub(this.nvel, this.air), this.decay));
+          this.$l.npos = pb.add(this.s0.xyz, pb.mul(this.nvel, this.stepDt));
+          this.$l.nage = pb.add(this.s0.w, this.stepDt);
+          if (collision !== PARTICLE_COLLISION_IDS.none) {
+            // Radius of the particle's sphere, simulation units
+            this.$l.r = pb.mul(
+              this.pParams.at(26).w,
+              pb.mix(this.pParams.at(12).x, this.pParams.at(12).y, rnd(this, ParticleChannel.Size)),
+              lutSize(this, pb.min(pb.div(this.nage, this.s1.w), 1))
+            );
+            if (collision === PARTICLE_COLLISION_IDS.plane) {
+              this.$l.plane = this.pParams.at(25);
+              this.$l.pd = pb.sub(pb.dot(this.plane.xyz, this.npos), this.plane.w);
+              this.$if(pb.lessThan(this.pd, this.r), function () {
+                // Out of the surface, but no farther than it could have gone in this step
+                this.$l.out = pb.min(
+                  pb.sub(this.r, this.pd),
+                  pb.add(this.r, pb.mul(pb.length(this.nvel), this.stepDt))
+                );
+                this.npos = pb.add(this.npos, pb.mul(this.plane.xyz, this.out));
+                this.$l.vn = pb.dot(this.nvel, this.plane.xyz);
+                this.$if(pb.lessThan(this.vn, 0), function () {
+                  this.$l.pc = this.pParams.at(26);
+                  this.nvel = pb.sub(
+                    pb.mul(pb.sub(this.nvel, pb.mul(this.plane.xyz, this.vn)), pb.sub(1, this.pc.y)),
+                    pb.mul(this.plane.xyz, this.vn, this.pc.x)
+                  );
+                  this.nage = pb.add(this.nage, pb.mul(this.pc.z, this.s1.w));
+                });
+              });
+            } else {
+              collideSDF(this, worldSpace, sdfLevels);
+            }
+          }
+          this.s0 = pb.vec4(this.npos, this.nage);
           this.s1 = pb.vec4(this.nvel, this.s1.w);
         });
         this.pState.setAt(pb.mul(this.slot, 2), this.s0);
@@ -477,7 +707,9 @@ function buildProgram(shapeType: number, worldSpace: boolean): GPUProgram {
     }
   });
   if (!program) {
-    throw new Error('Failed to build the particle simulation program');
+    throw new Error(
+      `Failed to build the particle simulation program: ${device.programBuilder.lastError || 'unknown error'}`
+    );
   }
   return program;
 }

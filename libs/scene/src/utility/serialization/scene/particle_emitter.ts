@@ -638,7 +638,8 @@ export function getParticleEmitterClass(): SerializableClass {
         },
         {
           name: 'Drag',
-          description: "Rate in 1/s the velocity approaches the air's velocity at",
+          description:
+            "How strongly the air carries particles: rate in 1/s their velocity approaches the air's. 0 leaves AirVelocity and the wind without effect; high for smoke, snow and leaves, low for sparks",
           type: 'float',
           default: 0,
           options: { group: 'Forces', minValue: 0, maxValue: 100 },
@@ -651,7 +652,7 @@ export function getParticleEmitterClass(): SerializableClass {
         },
         {
           name: 'AirVelocity',
-          description: 'Velocity of the air in world space (wind), see Drag',
+          description: 'Velocity of the air in world space; moves particles only when Drag is above 0',
           type: 'vec3',
           default: [0, 0, 0],
           options: { group: 'Forces' },
@@ -663,6 +664,186 @@ export function getParticleEmitterClass(): SerializableClass {
           },
           set(this: ParticleEmitter, value) {
             this.forces.airVelocity.setXYZ(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'WindInfluence',
+          description:
+            "Share of the scene's wind added to the air's velocity, gusts included; moves particles only when Drag is above 0",
+          type: 'float',
+          default: 0,
+          options: { group: 'Forces', minValue: 0, maxValue: 10 },
+          get(this: ParticleEmitter, value) {
+            value.num[0] = this.forces.windInfluence;
+          },
+          set(this: ParticleEmitter, value) {
+            this.forces.windInfluence = value.num[0];
+          }
+        },
+        {
+          name: 'NoiseStrength',
+          description:
+            'Average acceleration of the swirling curl noise (scaled with the emitter); 0 for none',
+          type: 'float',
+          default: 0,
+          options: { group: 'Forces', minValue: 0, maxValue: 1000 },
+          get(this: ParticleEmitter, value) {
+            value.num[0] = this.forces.noise.strength;
+          },
+          set(this: ParticleEmitter, value) {
+            this.forces.noise.strength = value.num[0];
+          }
+        },
+        {
+          name: 'NoiseFrequency',
+          description: 'Noise cells per unit: larger for smaller swirls',
+          type: 'float',
+          default: 1,
+          options: { group: 'Forces', minValue: 0, maxValue: 100 },
+          isHidden(this: ParticleEmitter) {
+            return !(this.forces.noise.strength > 0);
+          },
+          get(this: ParticleEmitter, value) {
+            value.num[0] = this.forces.noise.frequency;
+          },
+          set(this: ParticleEmitter, value) {
+            this.forces.noise.frequency = value.num[0];
+          }
+        },
+        {
+          name: 'NoiseScrollSpeed',
+          description: 'Speed the noise pattern changes at, units per second; 0 for a still field',
+          type: 'float',
+          default: 0.5,
+          options: { group: 'Forces', minValue: 0, maxValue: 100 },
+          isHidden(this: ParticleEmitter) {
+            return !(this.forces.noise.strength > 0);
+          },
+          get(this: ParticleEmitter, value) {
+            value.num[0] = this.forces.noise.scrollSpeed;
+          },
+          set(this: ParticleEmitter, value) {
+            this.forces.noise.scrollSpeed = value.num[0];
+          }
+        },
+        // ---- Collision ----
+        {
+          name: 'CollisionMode',
+          description:
+            "What particles collide with: a plane, or the scene's signed distance field (GPU simulation only, needs the scene SDF)",
+          type: 'string',
+          default: 'none',
+          options: {
+            group: 'Collision',
+            enum: { labels: ['None', 'Plane', 'Scene SDF'], values: ['none', 'plane', 'sdf'] }
+          },
+          get(this: ParticleEmitter, value) {
+            value.str[0] = this.collision.mode;
+          },
+          set(this: ParticleEmitter, value) {
+            const mode = value.str[0];
+            this.collision.mode = mode === 'plane' || mode === 'sdf' ? mode : 'none';
+          }
+        },
+        {
+          name: 'PlaneNormal',
+          description: 'Normal of the plane in world space, toward the side particles stay on',
+          type: 'vec3',
+          default: [0, 1, 0],
+          options: { group: 'Collision' },
+          isHidden(this: ParticleEmitter) {
+            return this.collision.mode !== 'plane';
+          },
+          get(this: ParticleEmitter, value) {
+            const n = this.collision.planeNormal;
+            value.num[0] = n.x;
+            value.num[1] = n.y;
+            value.num[2] = n.z;
+          },
+          set(this: ParticleEmitter, value) {
+            this.collision.planeNormal.setXYZ(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'PlaneHeight',
+          description:
+            'Distance of the plane from the world origin along its normal: the height of the ground for an upward normal',
+          type: 'float',
+          default: 0,
+          options: { group: 'Collision' },
+          isHidden(this: ParticleEmitter) {
+            return this.collision.mode !== 'plane';
+          },
+          get(this: ParticleEmitter, value) {
+            value.num[0] = this.collision.planeHeight;
+          },
+          set(this: ParticleEmitter, value) {
+            this.collision.planeHeight = value.num[0];
+          }
+        },
+        {
+          name: 'Bounce',
+          description: 'Share of the speed into the surface kept, bouncing back',
+          type: 'float',
+          default: 0.5,
+          options: { group: 'Collision', minValue: 0, maxValue: 1 },
+          isHidden(this: ParticleEmitter) {
+            return this.collision.mode === 'none';
+          },
+          get(this: ParticleEmitter, value) {
+            value.num[0] = this.collision.bounce;
+          },
+          set(this: ParticleEmitter, value) {
+            this.collision.bounce = value.num[0];
+          }
+        },
+        {
+          name: 'Friction',
+          description: 'Share of the speed along the surface lost each frame in contact',
+          type: 'float',
+          default: 0,
+          options: { group: 'Collision', minValue: 0, maxValue: 1 },
+          isHidden(this: ParticleEmitter) {
+            return this.collision.mode === 'none';
+          },
+          get(this: ParticleEmitter, value) {
+            value.num[0] = this.collision.friction;
+          },
+          set(this: ParticleEmitter, value) {
+            this.collision.friction = value.num[0];
+          }
+        },
+        {
+          name: 'LifetimeLoss',
+          description:
+            'Share of the lifetime used up by each frame in contact while moving into the surface; 1 kills at the first contact',
+          type: 'float',
+          default: 0,
+          options: { group: 'Collision', minValue: 0, maxValue: 1 },
+          isHidden(this: ParticleEmitter) {
+            return this.collision.mode === 'none';
+          },
+          get(this: ParticleEmitter, value) {
+            value.num[0] = this.collision.lifetimeLoss;
+          },
+          set(this: ParticleEmitter, value) {
+            this.collision.lifetimeLoss = value.num[0];
+          }
+        },
+        {
+          name: 'RadiusScale',
+          description: "Radius of a particle's collision sphere as a share of half its size",
+          type: 'float',
+          default: 1,
+          options: { group: 'Collision', minValue: 0, maxValue: 10 },
+          isHidden(this: ParticleEmitter) {
+            return this.collision.mode === 'none';
+          },
+          get(this: ParticleEmitter, value) {
+            value.num[0] = this.collision.radiusScale;
+          },
+          set(this: ParticleEmitter, value) {
+            this.collision.radiusScale = value.num[0];
           }
         },
         // ---- Bounds ----

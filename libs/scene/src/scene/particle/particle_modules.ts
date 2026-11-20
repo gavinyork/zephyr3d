@@ -218,16 +218,87 @@ export class ParticleOverLifeModule {
 }
 
 /**
+ * Curl noise: a swirling acceleration that varies smoothly through space, for smoke, embers and
+ * magic. It stirs particles without bunching them up. Part of the effect, so it scales with the
+ * emitter, and in local space it moves with it.
+ * @public
+ */
+export class ParticleNoiseModule {
+  /**
+   * Average acceleration in units of the effect per second squared, 0 for none; the strongest
+   * swirls reach three times it
+   */
+  strength = 0;
+  /** Noise cells per unit of the effect: larger for smaller swirls */
+  frequency = 1;
+  /** Speed the pattern changes at, in units of the effect per second; 0 for a still field */
+  scrollSpeed = 0.5;
+}
+
+/**
  * Forces on particles
  * @public
  */
 export class ParticleForcesModule {
   /** Acceleration in world space, units per second squared; not scaled with the emitter */
   readonly gravity = new Vector3(0, 0, 0);
-  /** Rate in 1/s the velocity approaches the air's velocity at */
+  /**
+   * How strongly the air carries particles: the rate in 1/s their velocity approaches the air's
+   * (airVelocity plus the wind). 0 leaves the air without effect; high for smoke, snow and
+   * leaves, low for sparks.
+   */
   drag = 0;
-  /** Velocity of the air in world space, see drag */
+  /** Velocity of the air in world space; moves particles only when drag is above 0 */
   readonly airVelocity = new Vector3(0, 0, 0);
+  /**
+   * Share of the scene's wind (`scene.env.wind`) added to the air's velocity; moves particles
+   * only when drag is above 0. The wind is sampled where each particle is, gusts included; a
+   * push of 1 is {@link ParticleForcesModule.WIND_SPEED} meters per second.
+   */
+  windInfluence = 0;
+  /** Curl noise */
+  readonly noise = new ParticleNoiseModule();
+  /** Air speed in units per second of a wind push of 1, see windInfluence */
+  static readonly WIND_SPEED = 10;
+}
+
+/**
+ * What particles collide with
+ * - none: nothing
+ * - plane: an infinite plane in world space
+ * - sdf: the scene's signed distance field (`scene.sdf`), static meshes, terrain and moving
+ *   meshes that have a field. GPU simulation only; the CPU simulation and scenes without the
+ *   field ignore it.
+ * @public
+ */
+export type ParticleCollisionMode = 'none' | 'plane' | 'sdf';
+
+/**
+ * Collisions of particles: each particle is a sphere, pushed out of the surface and bounced off
+ * it. Particles do not collide with each other.
+ * @public
+ */
+export class ParticleCollisionModule {
+  /** What to collide with */
+  mode: ParticleCollisionMode = 'none';
+  /** Normal of the plane in world space, toward the side particles stay on */
+  readonly planeNormal = new Vector3(0, 1, 0);
+  /**
+   * Distance of the plane from the world origin along its normal: with the default normal, the
+   * height of the ground
+   */
+  planeHeight = 0;
+  /** 0 to 1: share of the speed into the surface kept, bouncing back */
+  bounce = 0.5;
+  /** 0 to 1: share of the speed along the surface lost each step in contact */
+  friction = 0;
+  /**
+   * 0 to 1: share of the lifetime used up by each step in contact while moving into the surface;
+   * 1 kills particles at the first contact
+   */
+  lifetimeLoss = 0;
+  /** Radius of the sphere as a share of half the particle's size */
+  radiusScale = 1;
 }
 
 /**

@@ -11,16 +11,19 @@ import { QUEUE_OPAQUE } from '../../values';
 import { ParticleSpriteMaterial } from '../../material/particlesprite';
 import {
   ParticleBoundsModule,
+  ParticleCollisionModule,
   ParticleEmissionModule,
   ParticleForcesModule,
   ParticleOverLifeModule,
   ParticleShapeModule,
   ParticleStartModule
 } from './particle_modules';
+import { PARTICLE_NOISE_MAX, PARTICLE_NOISE_PERIOD } from './particle_noise';
 import { ParticleLUT } from './particle_lut';
 import { particleHash, particleRandom, particleSeedHash } from './particle_random';
 import {
   CpuParticleSim,
+  PARTICLE_COLLISION_IDS,
   PARTICLE_INSTANCE_FLOATS,
   PARTICLE_SHAPE_IDS,
   ParticleSimParams
@@ -71,13 +74,30 @@ const tmpVec3c = new Vector3();
 const tmpBox = new Float64Array(6);
 
 /**
+ * Directions the three noise potentials scroll in, so the field changes shape over time instead of
+ * sliding along
+ */
+const NOISE_SCROLL = [
+  [0.6, 0.64, 0.48],
+  [-0.48, 0.6, 0.64],
+  [0.64, -0.48, 0.6]
+];
+/** Starting offsets of the potentials in noise cells, keeping them unrelated */
+const NOISE_START = [0, 0, 0, 89.3, 31.7, 157.1, 201.9, 113.3, 47.9];
+/**
+ * Largest gust factor of the scene wind's noises (about [-1, 1]), with a margin, for the bounds
+ * of the GPU simulation
+ */
+const WIND_NOISE_MAX = 1.1;
+
+/**
  * A particle emitter: quads born from a shape, moved by forces, drawn with a
  * {@link ParticleSpriteMaterial}.
  *
  * @remarks
- * Parameters live in modules (`emission`, `shape`, `start`, `overLife`, `forces`, `bounds`)
- * whose fields can be changed at any time; they are read every frame. Curves over the life bake
- * when assigned, so assign them again after changing one.
+ * Parameters live in modules (`emission`, `shape`, `start`, `overLife`, `forces`, `collision`,
+ * `bounds`) whose fields can be changed at any time; they are read every frame. Curves over the
+ * life bake when assigned, so assign them again after changing one.
  *
  * Every random value of a particle is a hash of the seed and its birth serial, and the same
  * frame times give the same effect. Particles cannot be read back one by one: the simulation may
@@ -104,6 +124,8 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
   readonly overLife: ParticleOverLifeModule;
   /** Forces */
   readonly forces: ParticleForcesModule;
+  /** Collisions */
+  readonly collision: ParticleCollisionModule;
   /** Culling bounds */
   readonly bounds: ParticleBoundsModule;
   /** Share of the emitter's velocity particles take at birth; world space only */
@@ -136,6 +158,8 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
   private _simTime: number;
   private _emitAccum: number;
   private _pendingEmit: number;
+  /** Offsets of the noise potentials in cells, scrolled each step */
+  private readonly _noiseOffset: Float64Array;
   private readonly _window: ParticleWindow;
   private readonly _lut: ParticleLUT;
   private readonly _params: ParticleSimParams;
@@ -166,6 +190,7 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     this._lut = new ParticleLUT();
     this.overLife = new ParticleOverLifeModule(() => this._lut.bake(this.overLife.size, this.overLife.color));
     this.forces = new ParticleForcesModule();
+    this.collision = new ParticleCollisionModule();
     this.bounds = new ParticleBoundsModule();
     this.inheritVelocity = 0;
     this.duration = 5;
@@ -187,6 +212,7 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     this._simTime = 0;
     this._emitAccum = 0;
     this._pendingEmit = 0;
+    this._noiseOffset = new Float64Array(NOISE_START);
     this._window = new ParticleWindow();
     this._params = new ParticleSimParams();
     this._cpu = null;
@@ -470,6 +496,7 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     const win = this._window;
     this._simTime += dt;
     win.expire(this._simTime);
+    this.scrollNoise(dt);
     let spread = 0;
     let burst = 0;
     if (this._state === 'playing' && dt > 0) {
@@ -509,7 +536,11 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     }
     this.fillParams(dt, delta, firstNew, spread);
     if (gpu) {
-      gpu.step(this._params, this._lut);
+      gpu.step(
+        this._params,
+        this._lut,
+        this.collision.mode === 'sdf' ? (this.scene?.sdf.global ?? null) : null
+      );
       if (output) {
         this._numDraw = win.size;
         this._hasBounds = this.getGpuBounds();
@@ -552,22 +583,51 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
       Math.hypot(m[8], m[9], m[10])
     );
   }
+  /** Advances the scroll of the noise potentials by a step */
+  private scrollNoise(dt: number) {
+    const noise = this.forces.noise;
+    const cells = noise.scrollSpeed * noise.frequency * dt;
+    if (!cells || !Number.isFinite(cells)) {
+      return;
+    }
+    const o = this._noiseOffset;
+    for (let i = 0; i < 9; i++) {
+      // The noise repeats every period cells along each axis
+      o[i] = (o[i] + NOISE_SCROLL[Math.floor(i / 3)][i % 3] * cells) % PARTICLE_NOISE_PERIOD;
+    }
+  }
+  /** The scene's wind if it moves the particles */
+  private getWind() {
+    return this.forces.windInfluence !== 0 ? (this.scene?.env.wind ?? null) : null;
+  }
   /**
    * Speed no particle born now exceeds over its life, and how far the forces can take it beyond
    * that, in world units
-   * @returns [speed bound, distance added by gravity over the life]
+   * @returns [speed bound, distance added by the accelerations over the life]
    */
   private getSpeedBound(dt: number, delta: Vector3, life: number): [number, number] {
+    const scale = this.getScale();
     const inherit =
       this._space === 'world' && dt > 0
         ? (Math.abs(this.inheritVelocity) * Math.hypot(delta.x, delta.y, delta.z)) / dt
         : 0;
-    const air = this.forces.airVelocity;
-    const g = this.forces.gravity;
+    const forces = this.forces;
+    const air = forces.airVelocity;
+    let airSpeed = Math.hypot(air.x, air.y, air.z);
+    const wind = this.getWind();
+    if (wind) {
+      airSpeed +=
+        Math.abs(forces.windInfluence) *
+        ParticleForcesModule.WIND_SPEED *
+        wind.strength *
+        (1 + WIND_NOISE_MAX * (wind.gustStrength + wind.detailStrength));
+    }
+    const g = forces.gravity;
+    const accel = Math.hypot(g.x, g.y, g.z) + PARTICLE_NOISE_MAX * Math.max(0, forces.noise.strength) * scale;
     // Drag pulls toward the air's velocity, so the speed stays within the start speed plus
-    // twice the air's, plus what gravity adds
-    const speed = this.start.speed.maxAbs * this.getScale() + inherit + 2 * Math.hypot(air.x, air.y, air.z);
-    return [speed, 0.5 * Math.hypot(g.x, g.y, g.z) * life * life];
+    // twice the air's, plus what the accelerations add
+    const speed = this.start.speed.maxAbs * scale + inherit + 2 * airSpeed;
+    return [speed, 0.5 * accel * life * life];
   }
   /**
    * Box the particles born in this step stay in: in world space around where the emitter was
@@ -591,7 +651,16 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
         break;
     }
     const [speed, fall] = this.getSpeedBound(dt, delta, life);
-    const r = extent * this.getScale() + speed * life + fall;
+    let r = extent * this.getScale() + speed * life + fall;
+    if (this.collision.mode !== 'none') {
+      // Pushed out of surfaces by up to its radius
+      r +=
+        0.5 *
+        Math.abs(this.collision.radiusScale) *
+        this.start.size.maxAbs *
+        this._lut.maxSize *
+        this.getScale();
+    }
     if (this._space === 'world') {
       const m = this.worldMatrix;
       for (let i = 0; i < 3; i++) {
@@ -629,7 +698,7 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
         tmpVec3c.setXYZ(p.delta[0], p.delta[1], p.delta[2]),
         life
       );
-      // Gravity's speed at the end of the life is twice its average
+      // The accelerations' speed at the end of the life is twice their average
       reach = Math.hypot(width, size * p.stretchLength + (speed + (2 * fall) / life) * p.stretchSpeed);
     }
     for (let i = 0; i < 3; i++) {
@@ -753,6 +822,63 @@ export class ParticleEmitter extends applyMixins(GraphNode, mixinDrawable) imple
     for (let i = 0; i < 4; i++) {
       p.colorA[i] = start.colorA[i];
       p.colorB[i] = start.colorB[i];
+    }
+    // Noise is part of the effect: it scales with the emitter
+    const noise = this.forces.noise;
+    const noiseScale = worldSpace ? p.sizeScale : 1;
+    p.noiseStrength = Math.max(0, noise.strength) * noiseScale;
+    p.noiseFrequency = Math.max(0, noise.frequency) / Math.max(noiseScale, 1e-6);
+    p.noiseOffset.set(this._noiseOffset);
+    // The scene's wind blows along the ground
+    const wind = this.getWind();
+    p.wind = wind;
+    if (wind) {
+      const [wx, wz] = wind.directionXZ;
+      const k = this.forces.windInfluence * ParticleForcesModule.WIND_SPEED;
+      tmpVec3c.setXYZ(wx * k, 0, wz * k);
+      if (!worldSpace) {
+        this.invWorldMatrix.transformVectorAffine(tmpVec3c, tmpVec3c);
+      }
+      p.windScale[0] = tmpVec3c.x;
+      p.windScale[1] = tmpVec3c.y;
+      p.windScale[2] = tmpVec3c.z;
+    } else {
+      p.windScale.fill(0);
+    }
+    const collision = this.collision;
+    p.collisionMode = PARTICLE_COLLISION_IDS[collision.mode] ?? PARTICLE_COLLISION_IDS.none;
+    p.bounce = Math.min(Math.max(collision.bounce, 0), 1);
+    p.friction = Math.min(Math.max(collision.friction, 0), 1);
+    p.lifetimeLoss = Math.max(collision.lifetimeLoss, 0);
+    p.radiusFactor = 0.5 * Math.abs(collision.radiusScale) * (worldSpace ? p.sizeScale : 1);
+    // The plane, dot(n, p) = d in world space, in simulation space
+    const pn = collision.planeNormal;
+    let nlen = Math.hypot(pn.x, pn.y, pn.z);
+    let nx = nlen > 1e-9 ? pn.x / nlen : 0;
+    let ny = nlen > 1e-9 ? pn.y / nlen : 1;
+    let nz = nlen > 1e-9 ? pn.z / nlen : 0;
+    let d = collision.planeHeight;
+    if (!worldSpace) {
+      // dot(n, M p + t) = d  =>  dot(M^T n, p) = d - dot(n, t)
+      d -= nx * m[12] + ny * m[13] + nz * m[14];
+      const lx = m[0] * nx + m[1] * ny + m[2] * nz;
+      const ly = m[4] * nx + m[5] * ny + m[6] * nz;
+      const lz = m[8] * nx + m[9] * ny + m[10] * nz;
+      nlen = Math.max(Math.hypot(lx, ly, lz), 1e-9);
+      nx = lx / nlen;
+      ny = ly / nlen;
+      nz = lz / nlen;
+      d /= nlen;
+    }
+    p.plane[0] = nx;
+    p.plane[1] = ny;
+    p.plane[2] = nz;
+    p.plane[3] = d;
+    if (!worldSpace) {
+      const inv = this.invWorldMatrix;
+      for (let i = 0; i < 16; i++) {
+        p.invWorld[i] = inv[i];
+      }
     }
     const material = this._material.get();
     if (material?.alignment === 'stretched') {

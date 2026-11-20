@@ -1,5 +1,8 @@
+import type { Nullable } from '@zephyr3d/base';
+import type { WindField } from '../wind';
 import type { ParticleLUT } from './particle_lut';
 import { PARTICLE_LUT_SIZE } from './particle_lut';
+import { particleCurlNoise } from './particle_noise';
 import { ParticleChannel, particleBaseHash, particleRandom } from './particle_random';
 
 /**
@@ -88,10 +91,52 @@ export class ParticleSimParams {
   stretchSpeed = 0;
   /** Length scale of stretched quads along the velocity, 0 when not stretched (bounds only) */
   stretchLength = 0;
+  /** Curl noise acceleration on average, simulation units; 0 for none */
+  noiseStrength = 0;
+  /** Noise cells per simulation unit */
+  noiseFrequency = 1;
+  /** Offsets of the three noise potentials in cells: a xyz, b xyz, c xyz */
+  readonly noiseOffset = new Float64Array(9);
+  /** Scene wind, null for none */
+  wind: Nullable<WindField> = null;
+  /** Air velocity per unit of the wind's push, simulation space */
+  readonly windScale = new Float64Array(3);
+  /** See PARTICLE_COLLISION_IDS */
+  collisionMode = 0;
+  /** Plane in simulation space: unit normal (0..2), and its distance from the origin (3) */
+  readonly plane = new Float64Array(4);
+  bounce = 0;
+  friction = 0;
+  lifetimeLoss = 0;
+  /** Collision radius in simulation units per unit of the particle's size before the emitter's scale */
+  radiusFactor = 0;
+  /** Inverse of world, for colliding local particles in world space */
+  readonly invWorld = new Float64Array(16);
 }
+
+/**
+ * Collision modes as the simulation numbers them
+ * @internal
+ */
+export const PARTICLE_COLLISION_IDS = {
+  none: 0,
+  plane: 1,
+  sdf: 2
+} as const;
+
+const noiseOut = new Float64Array(3);
 
 /** Position (0..2) and direction (3..5) from the shape */
 const shapeOut = new Float64Array(6);
+
+/** Size factor of the curve at a normalized age, linear between the samples */
+function lutSize(lut: Float32Array, a: number) {
+  const x = a * (PARTICLE_LUT_SIZE - 1);
+  const i0 = Math.floor(x);
+  const i1 = i0 < PARTICLE_LUT_SIZE - 1 ? i0 + 1 : i0;
+  const s0 = lut[(PARTICLE_LUT_SIZE + i0) * 4];
+  return s0 + (lut[(PARTICLE_LUT_SIZE + i1) * 4] - s0) * (x - i0);
+}
 
 /**
  * Samples where a particle is born and which way it goes, in the space of the emitter
@@ -286,6 +331,20 @@ export class CpuParticleSim {
     const drag = p.drag > 0 ? p.drag : 0;
     const dragDt = Math.exp(-drag * dt);
     const worldSpace = p.worldSpace;
+    const noiseStrength = p.noiseStrength;
+    const noiseFrequency = p.noiseFrequency;
+    const wind = p.wind;
+    const windX = p.windScale[0];
+    const windY = p.windScale[1];
+    const windZ = p.windScale[2];
+    const collisionMode = p.collisionMode;
+    const planeX = p.plane[0];
+    const planeY = p.plane[1];
+    const planeZ = p.plane[2];
+    const planeD = p.plane[3];
+    const bounce = p.bounce;
+    const keepAlong = 1 - p.friction;
+    const lifetimeLoss = p.lifetimeLoss;
     let minX = Infinity;
     let minY = Infinity;
     let minZ = Infinity;
@@ -341,17 +400,73 @@ export class CpuParticleSim {
       if (age >= life) {
         continue;
       }
-      // Integrate: forces, then drag toward the air, then move
-      let vx = state[o + 4] + gx * stepDt;
-      let vy = state[o + 5] + gy * stepDt;
-      let vz = state[o + 6] + gz * stepDt;
-      vx = ax + (vx - ax) * decay;
-      vy = ay + (vy - ay) * decay;
-      vz = az + (vz - az) * decay;
-      let px = state[o + 0] + vx * stepDt;
-      let py = state[o + 1] + vy * stepDt;
-      let pz = state[o + 2] + vz * stepDt;
+      let px = state[o + 0];
+      let py = state[o + 1];
+      let pz = state[o + 2];
+      let vx = state[o + 4];
+      let vy = state[o + 5];
+      let vz = state[o + 6];
+      // Accelerations: gravity and the curl noise where the particle is
+      let fx = gx;
+      let fy = gy;
+      let fz = gz;
+      if (noiseStrength > 0) {
+        particleCurlNoise(
+          px * noiseFrequency,
+          py * noiseFrequency,
+          pz * noiseFrequency,
+          p.noiseOffset,
+          noiseOut
+        );
+        fx += noiseOut[0] * noiseStrength;
+        fy += noiseOut[1] * noiseStrength;
+        fz += noiseOut[2] * noiseStrength;
+      }
+      vx += fx * stepDt;
+      vy += fy * stepDt;
+      vz += fz * stepDt;
+      // Drag toward the air, with the scene's wind where the particle is
+      let airX = ax;
+      let airY = ay;
+      let airZ = az;
+      if (wind) {
+        const push = worldSpace
+          ? wind.sample(px, pz)
+          : wind.sample(
+              m[0] * px + m[4] * py + m[8] * pz + m[12],
+              m[2] * px + m[6] * py + m[10] * pz + m[14]
+            );
+        airX += windX * push;
+        airY += windY * push;
+        airZ += windZ * push;
+      }
+      vx = airX + (vx - airX) * decay;
+      vy = airY + (vy - airY) * decay;
+      vz = airZ + (vz - airZ) * decay;
+      px += vx * stepDt;
+      py += vy * stepDt;
+      pz += vz * stepDt;
       age += stepDt;
+      const sizeRandom = p.sizeMin + (p.sizeMax - p.sizeMin) * particleRandom(base, ParticleChannel.Size);
+      if (collisionMode === PARTICLE_COLLISION_IDS.plane) {
+        // The particle's sphere against the plane
+        const r = p.radiusFactor * sizeRandom * lutSize(lutData, age < life ? age / life : 1);
+        const d = planeX * px + planeY * py + planeZ * pz - planeD;
+        if (d < r) {
+          // Out of the surface, but no farther than it could have gone in this step
+          const out = Math.min(r - d, r + Math.hypot(vx, vy, vz) * stepDt);
+          px += planeX * out;
+          py += planeY * out;
+          pz += planeZ * out;
+          const vn = vx * planeX + vy * planeY + vz * planeZ;
+          if (vn < 0) {
+            vx = (vx - planeX * vn) * keepAlong - planeX * vn * bounce;
+            vy = (vy - planeY * vn) * keepAlong - planeY * vn * bounce;
+            vz = (vz - planeZ * vn) * keepAlong - planeZ * vn * bounce;
+            age += lifetimeLoss * life;
+          }
+        }
+      }
       state[o + 0] = px;
       state[o + 1] = py;
       state[o + 2] = pz;
@@ -387,10 +502,7 @@ export class CpuParticleSim {
       const s0 = (PARTICLE_LUT_SIZE + i0) * 4;
       const s1 = (PARTICLE_LUT_SIZE + i1) * 4;
       const sizeFactor = lutData[s0] + (lutData[s1] - lutData[s0]) * t;
-      const size =
-        (p.sizeMin + (p.sizeMax - p.sizeMin) * particleRandom(base, ParticleChannel.Size)) *
-        sizeFactor *
-        p.sizeScale;
+      const size = sizeRandom * sizeFactor * p.sizeScale;
       const width = size * p.aspect;
       const rotation =
         p.rotationMin +
