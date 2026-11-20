@@ -16,6 +16,7 @@
     - [Asset Loading](en/asset-loading.md)
     - [Text Rendering](en/text-rendering.md)
     - [Particles and Sprites](en/particles-sprites.md)
+    - [Particle Emitter](en/particle-emitter.md)
   - Lighting
     - [Overview](en/lighting-intro.md)
     - [Direct lighting](en/lighting-direct.md)

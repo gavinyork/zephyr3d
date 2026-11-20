@@ -1,4 +1,4 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Interpolator, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Scene,
   Application,
@@ -11,7 +11,8 @@ import {
   SphereShape,
   PBRMetallicRoughnessMaterial,
   UnlitMaterial,
-  ParticleSystem,
+  ParticleEmitter,
+  ParticleGradient,
   Sprite,
   StandardSpriteMaterial,
   getInput,
@@ -39,28 +40,6 @@ const myApp = new Application({
   canvas: document.querySelector('#my-canvas')
 });
 
-// Particle shape: a soft round blob. ParticleMaterial reads only the red channel
-// of the alpha map, as coverage, so the bytes are plain data in a linear format.
-function createAlphaMap(size) {
-  const data = new Uint8Array(size * size * 4);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = ((x + 0.5) / size) * 2 - 1;
-      const dy = ((y + 0.5) / size) * 2 - 1;
-      const t = Math.max(0, 1 - (dx * dx + dy * dy));
-      const value = Math.round(t * t * 255);
-      const i = (y * size + x) * 4;
-      data[i] = value;
-      data[i + 1] = value;
-      data[i + 2] = value;
-      data[i + 3] = value;
-    }
-  }
-  const tex = getDevice().createTexture2D('rgba8unorm', size, size);
-  tex.update(data, 0, 0, size, size);
-  return tex;
-}
-
 // Colour and opacity over a particle's life: [age, r, g, b, alpha], with the
 // colour as sRGB bytes and alpha linear. Hot and bright at birth, smoke at the end.
 const RAMP_KEYS = [
@@ -72,27 +51,17 @@ const RAMP_KEYS = [
   [1, 60, 60, 66, 0]
 ];
 
-// The ramp is sampled along U at the particle's normalized age (0 at birth, 1 at death)
-function createRampMap(width) {
-  const data = new Uint8Array(width * 4);
-  for (let x = 0; x < width; x++) {
-    const age = x / (width - 1);
-    let k = 1;
-    while (k < RAMP_KEYS.length - 1 && RAMP_KEYS[k][0] < age) {
-      k++;
-    }
-    const a = RAMP_KEYS[k - 1];
-    const b = RAMP_KEYS[k];
-    const f = (age - a[0]) / (b[0] - a[0]);
-    for (let c = 1; c <= 3; c++) {
-      data[x * 4 + c - 1] = Math.round(a[c] + (b[c] - a[c]) * f);
-    }
-    data[x * 4 + 3] = Math.round((a[4] + (b[4] - a[4]) * f) * 255);
-  }
-  // An sRGB format: sampling hands the shader linear colours, alpha is left as is
-  const tex = getDevice().createTexture2D('rgba8unorm-srgb', width, 1, { mipmapping: false });
-  tex.update(data, 0, 0, width, 1);
-  return tex;
+// The keys as curves over the normalized age (0 at birth, 1 at death). The emitter
+// multiplies its colours in linear space, so the sRGB bytes are converted first.
+function createGradient(keys) {
+  const ages = new Float32Array(keys.map((k) => k[0]));
+  const toLinear = (byte) => Math.pow(byte / 255, 2.2);
+  const rgb = new Float32Array(keys.flatMap((k) => [toLinear(k[1]), toLinear(k[2]), toLinear(k[3])]));
+  const alpha = new Float32Array(keys.map((k) => k[4]));
+  return new ParticleGradient(
+    new Interpolator('linear', 'vec3', ages, rgb),
+    new Interpolator('linear', 'number', ages, alpha)
+  );
 }
 
 // A map pin: round head, pointed tip at the bottom centre of its atlas cell
@@ -216,40 +185,38 @@ myApp.ready().then(function () {
   // #endregion sprite
 
   // #region particles
-  const particles = new ParticleSystem(scene);
-  // Sizes the instance buffer: room for the continuous flow plus a burst
-  particles.maxParticleCount = 800;
-  // 6 particles every 40 ms, i.e. 150 per second
-  particles.emitInterval = 40;
-  particles.emitCount = 6;
-  particles.emitterShape = 'sphere';
-  particles.emitterBehavior = 'surface';
-  particles.emitterShapeSizeMin = new Vector3(0.6, 0.6, 0.6);
-  particles.emitterShapeSizeMax = new Vector3(0.6, 0.6, 0.6);
-  // Spread of the launch direction around +Y, used by point, box and cylinder
-  particles.emitterConeRadiusMax = 0.4;
-  // Lifetime in seconds
-  particles.particleLifeMin = 1.4;
-  particles.particleLifeMax = 2.2;
-  particles.particleVelocityMin = 1;
-  particles.particleVelocityMax = 1.8;
-  // Born small and bright, grows into smoke
-  particles.particleSize1Min = 0.12;
-  particles.particleSize1Max = 0.2;
-  particles.particleSize2Min = 0.5;
-  particles.particleSize2Max = 0.8;
-  // With airResistence on, velocities ease towards the wind: the plume rises and drifts along +X
-  particles.airResistence = true;
-  particles.wind = new Vector3(0.6, 1.4, 0);
+  const particles = new ParticleEmitter(scene);
+  // Most particles alive at once: room for the continuous flow plus a burst
+  particles.maxParticles = 800;
+  // Particles per second, whatever the frame rate
+  particles.emission.rate = 150;
+  particles.shape.type = 'sphere';
+  particles.shape.radius = 0.6;
+  // 0: born on the surface of the shape, 1: anywhere inside it
+  particles.shape.thickness = 0;
+  // Spread around +Y in radians, used by point, box and edge
+  particles.shape.angle = 0.4;
+  // Lifetime in seconds, speed and size, each picked per particle in its range
+  particles.start.lifetime.set(1.4, 2.2);
+  particles.start.speed.set(1, 1.8);
+  particles.start.size.set(0.12, 0.2);
+  // Born small and bright, grows into smoke: factors over the normalized age
+  particles.overLife.size = new Interpolator(
+    'linear',
+    'number',
+    new Float32Array([0, 1]),
+    new Float32Array([1, 4])
+  );
+  particles.overLife.color = createGradient(RAMP_KEYS);
+  // Drag eases the velocities towards the air's: the plume rises and drifts along +X
+  particles.forces.drag = 1;
+  particles.forces.airVelocity.setXYZ(0.6, 1.4, 0);
   // #endregion particles
 
   // #region material
+  // A ParticleSpriteMaterial; without a texture each particle is a soft round dot
   const material = particles.material;
-  material.alphaMap = createAlphaMap(64);
-  material.rampMap = createRampMap(64);
   material.blendMode = 'additive';
-  // Particles wobble sideways by up to this distance, at jitterSpeed radians per second
-  material.jitterPower = 0.05;
   // #endregion material
 
   // A small bright ball marks the emitter; as a child node it travels with it
@@ -276,15 +243,14 @@ myApp.ready().then(function () {
 
   /** @type {HTMLSelectElement} */
   const shapeSelect = document.querySelector('#shape-select');
-  shapeSelect.value = particles.emitterShape;
+  shapeSelect.value = particles.shape.type;
   shapeSelect.addEventListener('change', function () {
-    particles.emitterShape = shapeSelect.value;
+    particles.shape.type = shapeSelect.value;
   });
   /** @type {HTMLSelectElement} */
   const behaviorSelect = document.querySelector('#behavior-select');
-  behaviorSelect.value = particles.emitterBehavior;
   behaviorSelect.addEventListener('change', function () {
-    particles.emitterBehavior = behaviorSelect.value;
+    particles.shape.thickness = behaviorSelect.value === 'surface' ? 0 : 1;
   });
   /** @type {HTMLSelectElement} */
   const blendSelect = document.querySelector('#blend-select');
@@ -297,9 +263,8 @@ myApp.ready().then(function () {
   /** @type {HTMLInputElement} */
   const worldCheck = document.querySelector('#world-check');
   worldCheck.addEventListener('change', function () {
-    // Also applies to the particles already alive: their stored positions are
-    // reinterpreted, not converted, so they jump until they expire
-    particles.worldSpace = worldCheck.checked;
+    // Changing the space clears the particles alive
+    particles.space = worldCheck.checked ? 'world' : 'local';
   });
   // #endregion worldspace
 
@@ -307,15 +272,15 @@ myApp.ready().then(function () {
   /** @type {HTMLInputElement} */
   const continuousCheck = document.querySelector('#continuous-check');
   continuousCheck.addEventListener('change', function () {
-    // emitCount 0 stops the timed emission; bursts still work
-    particles.emitCount = continuousCheck.checked ? 6 : 0;
+    // A rate of 0 stops the continuous emission; bursts still work
+    particles.emission.rate = continuousCheck.checked ? 150 : 0;
   });
   /** @type {HTMLButtonElement} */
   const burstButton = document.querySelector('#burst-button');
   burstButton.addEventListener('click', function () {
-    // Emits at once from the emitter's current transform; whatever exceeds
-    // maxParticleCount is dropped
-    particles.newParticle(200, particles.worldMatrix);
+    // Born at the next step, where the emitter is then; whatever exceeds
+    // maxParticles is dropped
+    particles.emit(200);
   });
   // #endregion burst
 

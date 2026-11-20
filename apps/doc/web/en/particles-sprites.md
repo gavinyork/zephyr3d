@@ -1,13 +1,13 @@
 # Particles and Sprites
 
-Zephyr3D provides two related billboard systems:
+Zephyr3D provides two kinds of camera-facing quads:
 
 - `Sprite` renders a single camera-facing quad.
-- `ParticleSystem` renders many camera-facing quads with per-particle movement and lifetime.
+- `ParticleEmitter` renders many quads with per-particle movement and lifetime, simulated on the CPU or the GPU.
 
-Use sprites for icons, markers, simple decals, and 2D elements in 3D space. Use particle systems for smoke, sparks, dust, fireflies, magic effects, and other repeated transient visuals.
+Use sprites for icons, markers, simple decals, and 2D elements in 3D space. Use particles for smoke, sparks, dust, fireflies, magic effects, and other repeated transient visuals. This page covers sprites, and what particles and sprites share: transparency sorting, picking and serialization. The parameters of particle emitters, CPU and GPU simulation, forces and collisions are covered in [Particle Emitter](en/particle-emitter.md), along with migrating from the deprecated `ParticleSystem`.
 
-> The code on this page is taken from the source of the runnable example `tut-90` below, which generates all of its textures in code. Only the snippet that loads particle textures from files is illustrative and leaves out application setup; `getEngine` comes from `@zephyr3d/scene`.
+> The code on this page is taken from the source of the runnable example `tut-90` below, which generates all of its textures in code.
 
 ## Example
 
@@ -15,12 +15,14 @@ Use sprites for icons, markers, simple decals, and 2D elements in 3D space. Use 
 
 A particle emitter (the small bright ball) circles the centre of the scene and keeps emitting particles that go from bright yellow to dark red and end as smoke. A map pin sprite sits on top of each of the three posts, and a star sprite spins in the middle. The panel in the top left:
 
-- **Shape / Spawn**: switches the emitter shape `emitterShape` and `emitterBehavior`.
+- **Shape / Spawn**: switches the emitter shape `shape.type`, and whether particles are born on the surface of the shape (`shape.thickness` 0) or anywhere inside it (1).
 - **Blend**: the particle material's `blendMode`, `additive` or `blend`.
-- **World space**: toggles `worldSpace`. The emitter is always moving, so the difference between the two spaces is plain to see.
-- **Continuous**: when unchecked, sets `emitCount` to 0 to stop continuous emission.
+- **World space**: toggles `space`. The emitter is always moving, so the difference between the two spaces is plain to see.
+- **Continuous**: when unchecked, sets `emission.rate` to 0 to stop continuous emission.
 - **Weighted OIT**: the camera's `oitMode`.
-- **Burst**: calls `newParticle()` to create 200 particles at once.
+- **Burst**: calls `emit()` to emit 200 particles at once.
+
+
 
 ## Sprite
 
@@ -48,88 +50,19 @@ Set the anchor and the rotation on the **node**: when a material is attached to 
 
 For text labels that stay crisp at any scale, use `MSDFTextSprite`; see [Text Rendering](en/text-rendering.md).
 
-## Particle System
+## Particles
 
-`ParticleSystem` is a scene node that owns emission settings, simulation parameters, and a `ParticleMaterial` (`particles.material`). Once attached, the scene updates it every frame: the simulation runs on the CPU, the result is uploaded as instance data, and the whole system is drawn in one draw call.
+The example's particle emitter:
 
 <<< @/../src/tut-90/main.js#particles
 
-**Emission rate**: `emitCount` particles are emitted every `emitInterval` milliseconds, whatever the frame rate. When the interval is shorter than a frame, every batch due within the frame goes out, each at its own time: earlier batches have already moved a little, and in world space they start where the emitter was at that moment. A fast-moving emitter therefore leaves a continuous trail instead of one clump per frame. After a stall, only the batches that could still be alive are made up. The example uses 6 every 40 milliseconds, 150 per second.
+The emitter emits 150 particles a second, born on a sphere of radius 0.6 and flying outward. The two curves in `overLife` make the particles grow to four times their size and turn from bright yellow to smoky grey over their life; `forces.drag` eases their velocities toward `airVelocity`, so the plume rises and drifts along +X.
 
-**Particle limit**: `maxParticleCount` sizes the instance buffer and is also a hard limit: once it is reached, new particles are simply not created. Estimate it as "emission rate × longest life + burst size": the example's continuous flow keeps about 150 × 2.2 ≈ 330 alive, and 800 leaves room for two bursts of 200.
-
-**Motion**: the direction of the initial velocity comes from the emitter shape (see the table below) and its magnitude is random between `particleVelocityMin` and `Max`. After that, every frame applies `gravity` (a constant acceleration) and `particleAccelMin` ~ `Max` along the velocity (negative values slow particles down). With `airResistence` set to true, the velocity also eases towards `wind` with a time constant of about one second; that is how the example's particles first spread out according to the shape and then rise and drift with the wind. Note that the property really is spelled `airResistence`: writing `airResistance` in JavaScript raises no error, it just does nothing.
-
-**Size**: each particle changes linearly from Size1 to Size2 over its life, both picked at random between their Min and Max. By default Size2 is smaller than Size1, so particles shrink; the example does the opposite and lets them grow, like flames turning into smoke.
-
-Common parameters and defaults:
-
-| Property | Default | Meaning |
-| --- | --- | --- |
-| `maxParticleCount` | `100` | The most particles alive at once; the instance buffer is sized by it |
-| `emitInterval` | `100` | Time between emissions, **in milliseconds** |
-| `emitCount` | `1` | Particles per emission; 0 stops continuous emission |
-| `particleLifeMin` / `Max` | `1` / `1.5` | Particle lifetime range, **in seconds** |
-| `particleVelocityMin` / `Max` | `2` / `3` | Initial speed range |
-| `particleSize1Min` / `Max` | `0.4` / `0.5` | Size range at birth |
-| `particleSize2Min` / `Max` | `0` / `0.1` | Size range at death |
-| `particleAccelMin` / `Max` | `-0.01` / `-0.02` | Acceleration range along the velocity |
-| `gravity` | `(0, 0, 0)` | Constant acceleration |
-| `wind` | `(0, 0, 0)` | Wind velocity. **Only applies while `airResistence` is true** |
-| `airResistence` | `false` | Whether the velocity eases towards `wind` |
-| `scalar` | `1` | Scales both the particles' movement and their birth size, to make a whole effect bigger or smaller |
-| `jitterSpeed` | `1` | Angular speed of the particle wobble (radians per second); its amplitude is the material's `jitterPower` |
-| `particleRotationMin` / `Max` | `0` / `0` | How fast particles turn in their own plane (radians per second). Particles are born upright, each picks a speed between the two, and negative speeds turn the other way |
-| `emitterShape` | `'point'` | See the table below |
-| `emitterBehavior` | `'surface'` | See the table below |
-| `emitterShapeSizeMin` / `Max` | `(1, 1, 1)` / `(1, 1, 1)` | Size of the emitter shape; each axis is picked at random between the two, per particle |
-| `emitterConeRadiusMin` / `Max` | `0` / `0.1` | How far the launch direction spreads away from +Y. For `point` and `box` the direction is (x, 1, z) normalized, with (x, z) spread evenly over the ring between radius Min and radius Max, so a Min above 0 gives a hollow cone; `cylinder` multiplies it by size Y for its vertical spread; the other shapes do not use it |
-| `worldSpace` | `true` | Whether particles live in world space or in the emitter's local space after birth; see below |
-
-Emitter shapes ("size" below is the value of `emitterShapeSize` picked between Min and Max):
-
-| Shape | Where particles are born | Initial direction |
-| --- | --- | --- |
-| `point` | The node origin; size is ignored | Along +Y, opened up by `emitterConeRadius` |
-| `sphere` | An ellipsoid with the size as its radii | Outwards from the centre |
-| `box` | A box with the size as its half extents | Along +Y, opened up by `emitterConeRadius` |
-| `cylinder` | The side of a cylinder with radius size X/Z and half height size Y | Horizontally outwards; `emitterConeRadius` times size Y gives the vertical spread |
-| `cone` | The side of a cone with its apex 2 × size Y above the node and a base radius of size X | Outwards and down along the cone surface |
-
-With `emitterBehavior` set to `surface` particles are born on the surface of the shape, with `volume` inside it; this applies to `sphere`, `box` and `cylinder` only. When the size Min and Max differ, the "surface" turns into a shell with some thickness; for an exact surface give both the same value, as the example does.
-
-## Particle Material
-
-The default material is `ParticleMaterial`, reached through `particles.material`:
+The example's colour keys are sRGB bytes, and `createGradient()` converts them to linear colours before building the `ParticleGradient`. The emitter computes colours in linear space; dividing 0-255 sRGB values by 255 would make the midtones too bright.
 
 <<< @/../src/tut-90/main.js#material
 
-| Property | Description |
-| --- | --- |
-| `alphaMap` | The particle's shape. **Only the red channel is read**, as opacity. It is data rather than colour, so it should be in a linear format. The top of the texture is the top of the quad: up the screen, or along the direction of motion when `directional` is true |
-| `rampMap` | Colour over the particle's life: sampled with the normalized age (0 at birth, 1 at death) as U and V at 0. RGB is the colour and A multiplies the opacity, so fading in and out goes here too. It is a colour texture and should be in an sRGB format |
-| `blendMode` | `'blend'` (default) or `'additive'` |
-| `jitterPower` | How far particles wobble around their path, in the plane perpendicular to their velocity; the speed is set by `ParticleSystem.jitterSpeed` |
-| `aspect` | Width/height ratio of the quad; width = size × `aspect` |
-| `directional` | When true, the quad's long axis follows the on-screen direction of the velocity; with an `aspect` below 1 this gives sparks stretched along their motion |
-
-With neither map set, particles are plain white squares. The particle material is unlit: the ramp colour is the output colour, which then goes through tone mapping as usual. `aspect`, `jitterPower` and `directional` also exist on `ParticleSystem` and are passed straight through to the material.
-
-The example's `createAlphaMap()` builds a 64×64 `rgba8unorm` round mask with a soft edge, and `createRampMap()` interpolates a set of keys into a 64×1 `rgba8unorm-srgb` texture. In a real project the two usually come from files (illustrative snippet):
-
-```ts
-const alpha = await getEngine().resourceManager.fetchTexture('/particles/smoke-alpha.png', {
-  linearColorSpace: true
-});
-const ramp = await getEngine().resourceManager.fetchTexture('/particles/smoke-ramp.png');
-
-particles.material.alphaMap = alpha;
-particles.material.rampMap = ramp;
-```
-
-`linearColorSpace: true` reads the mask as linear data, while the ramp uses the default sRGB. The editor loads the two maps the same way when it deserializes a particle material.
-
-`additive` adds the colour onto what is behind, so overlaps get brighter and dark colours all but vanish; use it for sparks, glows and magic effects. `blend` is ordinary transparency, for smoke, dust and leaves. Switch the example to Alpha blend and the grey end of the ramp becomes smoke that hides the background; switch back to Additive and the smoke nearly disappears, leaving only the glowing part.
+Particles are drawn with a `ParticleSpriteMaterial`; without a texture each particle is a soft round dot. `additive` adds the colour onto what is behind, so overlaps get brighter and dark colours all but vanish; use it for sparks, glows and magic effects. `blend` is ordinary transparency, for smoke, dust and leaves. Switch the example to Alpha blend and the grey end of the life becomes smoke that hides the background; switch back to Additive and the smoke nearly disappears, leaving only the glowing part.
 
 ## World Space and Local Space
 
@@ -137,28 +70,28 @@ The example moves the emitter in its tick handler every frame:
 
 <<< @/../src/tut-90/main.js#motion
 
-`worldSpace` decides which coordinate system particles live in after birth:
+`space` decides which coordinate system particles live in after birth:
 
-- `true` (default): position and velocity are transformed into world space at birth and have nothing to do with the emitter afterwards. Moving the emitter leaves a trail behind, which suits torches, exhaust and dust from footsteps.
-- `false`: particles stay in the emitter node's local space, and the whole cloud follows the node as it moves, rotates and scales. This suits effects that stick to an object, such as a shield aura.
+- `'world'` (default): independent of the emitter once born. Moving the emitter leaves a trail behind, which suits torches, exhaust and dust from footsteps.
+- `'local'`: particles stay in the emitter node's local space, and the whole cloud follows the node as it moves, rotates and scales. This suits effects that stick to an object, such as a shield aura.
 
 <<< @/../src/tut-90/main.js#worldspace
 
-Changing `worldSpace` at runtime converts the particles already alive to the new space: they keep their position and velocity, then move in the new space. After switching to local space, for example, they follow the emitter around.
+Changing `space` at runtime clears the particles alive, and the effect starts over in the new space.
 
 ## Manual Bursts
 
-The system emits continuously according to `emitInterval` and `emitCount`. For one-shot effects, set `emitCount` to 0 to stop continuous emission, then call `newParticle()` when needed:
+For one-shot effects, set `emission.rate` to 0 to stop continuous emission, then call `emit()` when needed:
 
 <<< @/../src/tut-90/main.js#burst
 
-`newParticle(count, worldMatrix)` creates `count` particles at once; the second argument is the transform used at birth, normally `particles.worldMatrix` (it is not used while `worldSpace` is false). Bursts are capped by `maxParticleCount` too, and particles beyond it are not created, so leave room in `maxParticleCount` for the burst.
+`emit(count)` emits `count` particles at the next step, born where the emitter is then. Bursts are capped by `maxParticles` too, and particles beyond it are not created, so leave room in `maxParticles` for the burst. For bursts that repeat every cycle, use `emission.bursts`; see [Particle Emitter](en/particle-emitter.md#emission-and-capacity).
 
 This is useful for impacts, explosions, or interaction feedback.
 
 ## Transparency Sorting and OIT
 
-Particles and sprites are drawn in the transparent queue and do not write depth. The particles of one system are drawn in a single draw call in order of birth, not sorted by distance to the camera, so dense `blend` particles can show wrong front-to-back order; `additive` gives the same result in any order and is not affected. When sorting artifacts show up, enable OIT on the camera:
+Particles and sprites are drawn in the transparent queue and do not write depth. The particles of one emitter are drawn in a single draw call in order of birth, not sorted by distance to the camera, so dense `blend` particles can show wrong front-to-back order; `additive` gives the same result in any order and is not affected. When sorting artifacts show up, enable OIT on the camera:
 
 <<< @/../src/tut-90/main.js#oit
 
@@ -166,19 +99,19 @@ Weighted blended OIT works on both WebGL2 and WebGPU and is the practical choice
 
 ## Picking
 
-Particles and sprites are drawable scene nodes and can be picked. A particle system's pick target is the system itself; a sprite can point its pick result at another node with `setPickTarget()`.
+Particles and sprites are drawable scene nodes and can be picked. A particle emitter's pick target is the emitter itself; a sprite can point its pick result at another node with `setPickTarget()`.
 
 ## Serialization
 
-`Sprite`, `SpriteMaterial`, `StandardSpriteMaterial`, `ParticleSystem`, and `ParticleMaterial` are registered with serialization. Editor-authored sprites and particle nodes can be saved in scenes or prefabs.
+`Sprite`, `SpriteMaterial`, `StandardSpriteMaterial`, `ParticleEmitter`, and `ParticleSpriteMaterial` are registered with serialization. Editor-authored sprites and particle nodes can be saved in scenes or prefabs. The deprecated `ParticleSystem` and `ParticleMaterial` are still registered, so older scenes keep loading.
 
 Textures used by sprite and particle materials should have asset ids before serialization. Textures generated in code, like the ones in the example, have no asset id and cannot be referenced from saved data.
 
 ## Limitations and Pitfalls
 
 - **Sprites only inherit their parent's translation.** The parent's rotation and scale do not apply to a sprite; its size and in-plane rotation come from its own transform alone.
-- Particles do not read scene depth (there are no soft particles), so they show hard edges where they cut into geometry; place large particles such as smoke with that in mind.
+- Particles do not read scene depth by default, so they show hard edges where they cut into geometry. For large particles such as smoke, turn on the material's `softDistance` (soft particles), at the cost of needing the scene depth.
 
 ## Performance Notes
 
-The simulation runs per particle on the CPU and the data is uploaded again every frame, so the cost grows linearly with the number of live particles. Keep `maxParticleCount` close to the maximum number you actually need. Prefer a few larger particle systems over many tiny systems when they share behavior and material. Avoid replacing textures or materials every frame; animate parameters instead.
+What particles cost depends on where they are simulated: the CPU simulation computes every particle and uploads the data again each frame, so the cost grows linearly with the live particles, while the GPU simulation on WebGPU hardly uses the CPU at all. See [Particle Emitter](en/particle-emitter.md#cpu-or-gpu) for choosing. Keep `maxParticles` close to the maximum number you actually need. Avoid replacing textures or materials every frame; animate parameters instead.

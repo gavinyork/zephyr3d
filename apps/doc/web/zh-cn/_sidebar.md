@@ -16,6 +16,7 @@
     - [资源加载](zh-cn/asset-loading.md)
     - [文本渲染](zh-cn/text-rendering.md)
     - [粒子与 Sprite](zh-cn/particles-sprites.md)
+    - [粒子发射器](zh-cn/particle-emitter.md)
   - 光照
     - [概述](zh-cn/lighting-intro.md)
     - [直接光照](zh-cn/lighting-direct.md)

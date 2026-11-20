@@ -720,16 +720,16 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               }
             },
             {
-              label: 'Particle System',
+              label: 'Particle Emitter',
               action: () => {
-                this.handleAddNode(ParticleSystem, 'Add particle system');
+                this.handleAddNode(ParticleEmitter, 'Add particle emitter');
                 return true;
               }
             },
             {
-              label: 'Particle Emitter',
+              label: 'Particle System (Legacy)',
               action: () => {
-                this.handleAddNode(ParticleEmitter, 'Add particle emitter');
+                this.handleAddNode(ParticleSystem, 'Add particle system');
                 return true;
               }
             },

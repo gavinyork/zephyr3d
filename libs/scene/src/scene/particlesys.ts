@@ -37,17 +37,21 @@ const PS_WORLDSPACE = 1 << 8;
 
 /**
  * Particle emitter shape
+ * @deprecated Shape of the deprecated {@link ParticleSystem}; see {@link ParticleShapeType}
  * @public
  */
 export type EmitterShape = 'point' | 'sphere' | 'box' | 'cylinder' | 'cone';
 /**
  * Particle emitter behavior
+ * @deprecated Of the deprecated {@link ParticleSystem}; see {@link ParticleShapeModule.thickness}
  * @public
  */
 export type EmitterBehavior = 'surface' | 'volume';
 
 /**
  * Particle system class
+ * @deprecated Use {@link ParticleEmitter}, which simulates on the GPU as well, with the same
+ * behavior on the CPU. ParticleSystem stays for existing scenes and only gets bug fixes.
  * @public
  */
 export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
