@@ -22,6 +22,8 @@ import { Vector4 } from '@zephyr3d/base';
  * - `cullMode = 'none'`
  * - `blendMode = 'blend'`
  *
+ * @deprecated Material of the deprecated {@link ParticleSystem}; {@link ParticleEmitter} draws
+ * with {@link ParticleSpriteMaterial}.
  * @public
  */
 export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleMaterial> {
@@ -79,6 +81,10 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
     return this._alphaMap.get();
   }
   set alphaMap(tex) {
+    // A texture loaded after the material was disposed would be held forever
+    if (this.disposed) {
+      return;
+    }
     if (tex !== this._alphaMap.get()) {
       this._alphaMap.set(tex);
       this.useFeature(ParticleMaterial.FEATURE_ALPHA_MAP, !!this._alphaMap.get());
@@ -96,6 +102,9 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
     return this._rampMap.get();
   }
   set rampMap(tex) {
+    if (this.disposed) {
+      return;
+    }
     if (tex !== this._rampMap.get()) {
       this._rampMap.set(tex);
       this.useFeature(ParticleMaterial.FEATURE_RAMP_MAP, !!this._rampMap.get());
@@ -321,5 +330,11 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
         bindGroup.setTexture('rampMap', this.rampMap);
       }
     }
+  }
+  /** Releases the textures */
+  protected onDispose() {
+    super.onDispose();
+    this._alphaMap.dispose();
+    this._rampMap.dispose();
   }
 }

@@ -13,6 +13,10 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
   private readonly _savedAlphaOutputs: InterpolateData;
   private readonly _onPreview: (value: number[]) => void;
   private readonly _onChange: () => void;
+  /** OK was pressed: the edits stay */
+  private _committed: boolean;
+  /** Closed and cleaned up */
+  private _finished: boolean;
   constructor(
     id: string,
     useAlpha: boolean,
@@ -33,6 +37,8 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
     this._savedAlphaOutputs = alphaInterpolator ? alphaInterpolator.outputs.slice() : null;
     this._onPreview = onPreview;
     this._onChange = onChange ?? null;
+    this._committed = false;
+    this._finished = false;
     this._creator.on('preview_position', this.preview, this);
     if (this._onChange) {
       this._creator.on('ramp_changed', this._onChange);
@@ -74,21 +80,32 @@ export class DlgEditColorTrack extends DialogRenderer<boolean> {
     }
     ImGui.EndChild();
     if (ImGui.Button('Ok')) {
-      const edited = this._creator.changed;
-      this._creator.dispose();
-      this.close(edited);
+      this._committed = true;
+      this.close(this._creator.changed);
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
-      this._creator.dispose();
-      this._rgbInterpolator.inputs = this._savedRGBInputs;
-      this._rgbInterpolator.outputs = this._savedRGBOutputs;
-      if (this._alphaInterpolator) {
-        this._alphaInterpolator.inputs = this._savedAlphaInputs;
-        this._alphaInterpolator.outputs = this._savedAlphaOutputs;
-      }
-      this._onChange?.();
       this.close(false);
     }
+  }
+  /**
+   * Closes the dialog, however it is closed (its buttons, or from outside when the scene view
+   * ends all editing): anything but OK puts the curves back, and the creator's texture is freed
+   */
+  close(result: boolean) {
+    if (!this._finished) {
+      this._finished = true;
+      if (!this._committed) {
+        this._rgbInterpolator.inputs = this._savedRGBInputs;
+        this._rgbInterpolator.outputs = this._savedRGBOutputs;
+        if (this._alphaInterpolator) {
+          this._alphaInterpolator.inputs = this._savedAlphaInputs;
+          this._alphaInterpolator.outputs = this._savedAlphaOutputs;
+        }
+        this._onChange?.();
+      }
+      this._creator.dispose();
+    }
+    super.close(result);
   }
 }

@@ -13,6 +13,10 @@ export class DlgCurveEditor extends DialogRenderer<boolean> {
   private readonly savedInputs: Nullable<InterpolateData>;
   private readonly savedOutputs: Nullable<InterpolateData>;
   private readonly savedMode: Nullable<InterpolationMode>;
+  /** OK was pressed: the edits stay */
+  private committed: boolean;
+  /** Closed and cleaned up */
+  private finished: boolean;
   constructor(
     id: string,
     onPreview: (value: number[]) => void,
@@ -24,7 +28,9 @@ export class DlgCurveEditor extends DialogRenderer<boolean> {
     super(id, width, height);
     this.onPreview = onPreview;
     this.onChange = onChange ?? null;
-    // The editor changes the curve in place: kept to put back on cancel
+    this.committed = false;
+    this.finished = false;
+    // The editor changes the curve in place: kept to put back unless OK is pressed
     this.interpolator = interpolator;
     this.savedInputs = interpolator ? interpolator.inputs.slice() : null;
     this.savedOutputs = interpolator ? interpolator.outputs.slice() : null;
@@ -79,19 +85,11 @@ export class DlgCurveEditor extends DialogRenderer<boolean> {
     ImGui.EndChild();
     ImGui.Columns(2, 'ButtonLayout', false);
     if (ImGui.Button('Ok')) {
-      const edited = this.editor.changed;
-      this.editor.off('preview_position', this.preview, this);
-      this.close(edited);
+      this.committed = true;
+      this.close(this.editor.changed);
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
-      this.editor.off('preview_position', this.preview, this);
-      if (this.interpolator && this.savedInputs && this.savedOutputs) {
-        this.interpolator.inputs = this.savedInputs;
-        this.interpolator.outputs = this.savedOutputs;
-        this.interpolator.mode = this.savedMode!;
-        this.onChange?.();
-      }
       this.close(false);
     }
     if (this.labels) {
@@ -101,5 +99,25 @@ export class DlgCurveEditor extends DialogRenderer<boolean> {
       }
     }
     ImGui.NextColumn();
+  }
+  /**
+   * Closes the dialog, however it is closed (its buttons, or from outside when the scene view
+   * ends all editing): anything but OK puts the curve back
+   */
+  close(result: boolean) {
+    if (!this.finished) {
+      this.finished = true;
+      this.editor.off('preview_position', this.preview, this);
+      if (this.onChange) {
+        this.editor.off('curve_changed', this.onChange);
+      }
+      if (!this.committed && this.interpolator && this.savedInputs && this.savedOutputs) {
+        this.interpolator.inputs = this.savedInputs;
+        this.interpolator.outputs = this.savedOutputs;
+        this.interpolator.mode = this.savedMode!;
+        this.onChange?.();
+      }
+    }
+    super.close(result);
   }
 }

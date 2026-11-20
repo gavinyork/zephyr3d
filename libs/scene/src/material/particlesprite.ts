@@ -120,6 +120,10 @@ export class ParticleSpriteMaterial extends MeshMaterial implements Clonable<Par
     return this._texture.get();
   }
   set texture(tex: Nullable<Texture2D>) {
+    // A texture loaded after the material was disposed would be held forever
+    if (this.disposed) {
+      return;
+    }
     if (tex !== this._texture.get()) {
       this._texture.set(tex);
       this.useFeature(ParticleSpriteMaterial.FEATURE_TEXTURE, !!tex);
@@ -222,6 +226,11 @@ export class ParticleSpriteMaterial extends MeshMaterial implements Clonable<Par
       this.useFeature(ParticleSpriteMaterial.FEATURE_NEAR_FADE, val > 0);
       this.uniformChanged();
     }
+  }
+  /** Releases the texture */
+  protected onDispose() {
+    super.onDispose();
+    this._texture.dispose();
   }
   /** {@inheritDoc Material.needSceneDepth} */
   needSceneDepth(): boolean {
