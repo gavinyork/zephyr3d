@@ -1099,10 +1099,10 @@
     "water-foam-storm": {
       "accepted": {
         "linux-x64": [
-          "afea70370767d1c2a226bba2ac96c470"
+          "36b4bb4af80d03739eef62c131eb5831"
         ],
         "win32-x64": [
-          "afea70370767d1c2a226bba2ac96c470"
+          "36b4bb4af80d03739eef62c131eb5831"
         ]
       },
       "size": 512
