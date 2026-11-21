@@ -597,10 +597,13 @@ export class Scene
    * - Update environment light synchronization.
    * - Dispatch `update` event.
    * - Update the main camera's controller if its `updatePhase` is `'early'`.
-   * - Drain the one-shot node update queue and call `node.update(...)`.
+   * - Drain the one-shot node update queue and call `node.update(...)`, then refresh the
+   *   matrices of the drawables moved so far.
    * - Dispatch `afterupdate` event; a physics world steps here.
    * - Call scripts' `onLateUpdate`, then update the main camera's controller if its
    *   `updatePhase` is `'late'`, then dispatch `lateupdate` event.
+   * - Refresh the matrices of the drawables moved since, by physics, late scripts or late
+   *   camera controllers, so they draw where they are this frame.
    * - Apply pending octree placement updates.
    *
    */
@@ -638,6 +641,15 @@ export class Scene
       );
       this.mainCamera?.updateController(deltaInSeconds, 'late');
       this.dispatchEvent('lateupdate', this);
+      // Physics writes its poses back in afterupdate, after the drawables were refreshed above;
+      // without a second refresh everything it moves would draw a frame behind, and a camera
+      // following it ('late' controllers) or riding on it (a cockpit view) a frame ahead of it.
+      // A drawable refreshed twice in a frame keeps the previous frame's matrix for its motion.
+      if (this._drawableUpdateQueue.size > 0) {
+        for (const drawable of this._drawableUpdateQueue.take()) {
+          drawable.updateState();
+        }
+      }
       this.updateNodePlacement(this._octree, this._nodePlaceList);
       const camera = this.mainCamera;
       if (camera && (this._gi?.enabled || this._sdf?.enabled)) {
