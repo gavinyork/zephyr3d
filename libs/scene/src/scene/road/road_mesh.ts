@@ -22,6 +22,15 @@ const SKIRT_START = 0.9;
  */
 const SHOULDER_SINK = 0.15;
 /**
+ * Depth below the ground of the outer edge of a shoulder in the collider. The collider does not
+ * follow the drawn shoulder's skirt, which rises from SHOULDER_SINK under the ground to
+ * SHOULDER_CLEARANCE above it over a tenth of the shoulder: drawn it is faded out and unseen, but
+ * as a collider it is a steep ledge a few centimetres high that wheels and car bodies coming off
+ * the ground run into. Instead the collider's shoulder runs straight down from its middle to just
+ * under the ground at its outer edge, a gentle slope the terrain's collider takes over from.
+ */
+const COLLIDER_SHOULDER_SINK = 0.03;
+/**
  * Radius around a shoulder vertex the ground is sampled over, taking the highest: the ground
  * between vertices is drawn as triangles of the height map, which can bulge above a plane through
  * the heights at the vertices alone
@@ -354,6 +363,8 @@ export function buildRoadGeometry(curve: RoadCurve, options: RoadMeshOptions): R
   const px = new Float64Array(COLUMNS);
   const py = new Float64Array(COLUMNS);
   const pz = new Float64Array(COLUMNS);
+  // Heights of the collider's cross section, see COLLIDER_SHOULDER_SINK
+  const colY = new Float64Array(COLUMNS);
   const nrm = [0, 0, 0];
   for (let k0 = 0; k0 < steps; k0 += perChunk) {
     const k1 = Math.min(k0 + perChunk, steps);
@@ -412,6 +423,19 @@ export function buildRoadGeometry(curve: RoadCurve, options: RoadMeshOptions): R
         if (go !== null) {
           py[outer] = go - SHOULDER_SINK;
         }
+        colY[mid] = py[mid];
+        if (go !== null) {
+          // Straight from the middle of the shoulder to under the ground at its edge
+          colY[outer] = Math.min(py[mid], go - COLLIDER_SHOULDER_SINK);
+          colY[skirt] =
+            colY[mid] + ((colY[outer] - colY[mid]) * (lat[skirt] - lat[mid])) / (lat[outer] - lat[mid]);
+        } else {
+          colY[outer] = py[outer];
+          colY[skirt] = py[skirt];
+        }
+      }
+      for (let j = 3; j <= 6; j++) {
+        colY[j] = py[j];
       }
       const v = samples.v[k] / tileL;
       for (let j = 3; j <= 6; j++) {
@@ -454,7 +478,7 @@ export function buildRoadGeometry(curve: RoadCurve, options: RoadMeshOptions): R
       }
       if (shoulder) {
         for (let j = 0; j < COLUMNS; j++) {
-          collider.positions.push(px[j], py[j], pz[j]);
+          collider.positions.push(px[j], colY[j], pz[j]);
         }
       } else {
         for (let j = 3; j <= 6; j++) {
