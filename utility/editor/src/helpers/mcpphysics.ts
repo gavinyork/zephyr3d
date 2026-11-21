@@ -109,15 +109,28 @@ const OVERRIDE_GROUPS: readonly [string, string][] = [
 ];
 
 /**
- * The presets fit a collider as a box around what its node shows, setting only its size. When
- * the overrides turn it into another shape, fit that shape's own dimensions to the same box,
- * unless the overrides give them: a sphere spans the box, a capsule or a cylinder stands in it.
- * Without this the radius and height keep their defaults and the shape is a small one floating
- * in the middle of the object.
+ * The presets fit a collider as a box around what its node shows, setting its size and its offset
+ * to the middle of the box. When the overrides turn it into another shape, fit that shape's own
+ * dimensions to the same box, unless the overrides give them: a sphere spans the box, a capsule or
+ * a cylinder stands in it. Without this the radius and height keep their defaults and the shape is
+ * a small one floating in the middle of the object.
+ *
+ * Mesh and convex colliders take the node's triangles where they are, and terrain colliders the
+ * terrain's heights: the box's offset would move them off what they are made of (a mesh collider
+ * on a gantry ended up half its height above it), so it goes, unless the overrides give one.
  */
 function refitShape(collider: Collider, overrides: Record<string, unknown>) {
   const given = (name: string) => name in overrides || toCamelCase(name) in overrides;
-  if (!given('shape') || given('size')) {
+  if (!given('shape')) {
+    return;
+  }
+  if (
+    (collider.shape === 'mesh' || collider.shape === 'convex' || collider.shape === 'terrain') &&
+    !given('offset')
+  ) {
+    collider.offset = Vector3.zero();
+  }
+  if (given('size')) {
     return;
   }
   const size = collider.size;
