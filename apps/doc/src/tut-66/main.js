@@ -156,6 +156,8 @@ function buildOceanScene() {
   sun.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
   sun.intensity = 8;
   sun.castShadow = true;
+  sun.shadow.depthBias = 0.005;
+  sun.shadow.normalBias = 3;
 
   // Shapes built in code have no baked distance field to read; these are
   // baked at load below, so the water finds where they meet it and rings them
@@ -310,17 +312,17 @@ function buildPoolScene() {
   water.absorptionScale = 2.5;
 
   const waves = new FFTWaveGenerator();
-  waves.wind = new Vector2(1, 1);
-  waves.setWaveStrength(0, 0.4);
-  waves.setWaveStrength(1, 0.4);
-  waves.setWaveStrength(2, 0.02);
+  waves.wind = new Vector2(1.5, 1.5);
+  waves.setWaveStrength(0, 0.1);
+  waves.setWaveStrength(1, 0.0);
+  waves.setWaveStrength(2, 0.0);
   waves.setWaveCroppiness(0, -1.5);
   waves.setWaveCroppiness(1, -1.2);
   waves.setWaveCroppiness(2, -0.5);
   water.waveGenerator = waves;
 
   // Very clear water: the point is to see through it to the tiles.
-  water.absorption = new Vector3(0.08, 0.03, 0.02);
+  water.absorption = new Vector3(0.1, 0.04, 0.03);
   water.scattering = new Vector3(0.01, 0.02, 0.03);
   water.reflectionStrength = 0.5;
   water.refractionScale = 1;

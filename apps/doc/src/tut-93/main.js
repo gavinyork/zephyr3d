@@ -71,10 +71,12 @@ myApp.ready().then(function () {
   primitives.push(ground.primitive);
   const sphere = new Mesh(scene, new SphereShape({ radius: 1.2 }), makeMaterial(0.8, 0.3, 0.2));
   sphere.position.setXYZ(0, 1, 0);
+  sun.shadow.shadowRegion.addStaticCaster(sphere);
   primitives.push(sphere.primitive);
   const box = new Mesh(scene, new BoxShape({ size: 2 }), makeMaterial(0.2, 0.45, 0.8));
   box.position.setXYZ(-3, 1, 0.5);
   box.rotation.fromEulerAngle(0, Math.PI / 6, 0);
+  sun.shadow.shadowRegion.addStaticCaster(box);
   primitives.push(box.primitive);
   const capsule = new Mesh(
     scene,
@@ -83,6 +85,7 @@ myApp.ready().then(function () {
   );
   capsule.position.setXYZ(1.5, 0.6, -2.4);
   capsule.rotation.fromEulerAngle(0, 0, Math.PI / 2);
+  sun.shadow.shadowRegion.addStaticCaster(capsule);
   primitives.push(capsule.primitive);
   // Four pillars share one primitive, so they share one field as well
   const pillarShape = new CylinderShape({ topRadius: 0.5, bottomRadius: 0.5, height: 4 });
@@ -95,6 +98,7 @@ myApp.ready().then(function () {
   ]) {
     const pillar = new Mesh(scene, pillarShape, pillarMaterial);
     pillar.position.setXYZ(x, 0, z);
+    sun.shadow.shadowRegion.addStaticCaster(pillar);
   }
   primitives.push(pillarShape);
 
@@ -108,6 +112,7 @@ myApp.ready().then(function () {
     makeMaterial(0.9, 0.7, 0.2)
   );
   ring.sdfMode = 'dynamic';
+  sun.shadow.shadowRegion.addDynamicCaster(ring);
   // #endregion ring
   primitives.push(ring.primitive);
   let angle = 0;
