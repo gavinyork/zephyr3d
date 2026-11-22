@@ -930,7 +930,7 @@ export class WaterInteraction extends Disposable {
     this._waveSpeed = 1.5;
     this._damping = 1;
     this._maxAmplitude = 0.5;
-    this._foamAmount = 3;
+    this._foamAmount = 10;
     this._foamDecay = 0.6;
     this._foamMinSpeed = 0.5;
     this._foamMaxSpeed = 2;
@@ -1087,7 +1087,8 @@ export class WaterInteraction extends Disposable {
   }
   /**
    * Rate foam is made at where the water is churned to the full, in coverage
-   * per second; 0 disables the foam. Defaults to 3.
+   * per second; 0 disables the foam. Defaults to 10, which takes the water
+   * beside a hull at speed to full foam.
    *
    * Foam is air trapped in the water, as in Ihmsen et al., "Unified spray,
    * foam and bubbles for particle-based fluids": it is made in proportion to

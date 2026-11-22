@@ -18,13 +18,21 @@ const FOAM_CLUMPS = 4;
 const FOAM_CLUMP_WEIGHT = 0.5;
 /**
  * Target grey levels at every sixteenth of the texels in order, darkest to
- * brightest. The default texture is remapped to them rank for rank, which
- * fixes how much of it a given foam density uncovers.
+ * brightest, as encoded in an sRGB image. The default texture is remapped to
+ * them rank for rank, which fixes how much of it a given foam density
+ * uncovers. A foam image is loaded as sRGB and so sampled decoded to linear;
+ * the default texture holds the levels decoded the same way (see
+ * srgbToLinear), so the same density uncovers as much of it as of an image.
  */
 const FOAM_LEVELS = [
   0.0, 0.455, 0.51, 0.557, 0.596, 0.631, 0.655, 0.675, 0.694, 0.71, 0.722, 0.737, 0.753, 0.769, 0.796, 0.839,
   0.98
 ];
+
+/** The sRGB transfer function's inverse (IEC 61966-2-1): an encoded value to linear. */
+function srgbToLinear(c: number) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
 
 /** Deterministic hash of integer lattice coordinates to [0, 1). */
 function hash2(x: number, y: number, seed: number) {
@@ -114,14 +122,14 @@ export function getDefaultFoamTexture() {
         values[y * n + x] = FOAM_CLUMP_WEIGHT * clumps + (1 - FOAM_CLUMP_WEIGHT) * bubbles;
       }
     }
-    // Rank for rank onto FOAM_LEVELS
+    // Rank for rank onto FOAM_LEVELS, decoded as a foam image is when sampled
     const order = Array.from(values.keys()).sort((a, b) => values[a] - values[b]);
     const data = new Uint8Array(n * n * 4);
     const last = FOAM_LEVELS.length - 1;
     order.forEach((texel, rank) => {
       const t = (rank / (order.length - 1)) * last;
       const k = Math.min(Math.floor(t), last - 1);
-      const level = FOAM_LEVELS[k] + (FOAM_LEVELS[k + 1] - FOAM_LEVELS[k]) * (t - k);
+      const level = srgbToLinear(FOAM_LEVELS[k] + (FOAM_LEVELS[k + 1] - FOAM_LEVELS[k]) * (t - k));
       const o = texel * 4;
       data[o] = data[o + 1] = data[o + 2] = Math.round(level * 255);
       data[o + 3] = 255;

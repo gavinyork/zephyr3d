@@ -178,19 +178,21 @@ water.material.refractionBlur = 1;
 
 ## Crest Foam
 
-Crest foam comes from the surface folding over at a breaking wave. The `waveGenerator` supplies the folding data and the material maps it into a coverage fraction.
+Crest foam comes from the surface folding over at a breaking wave. The `waveGenerator` measures the folding and turns it into a foam density, so how readily the crests foam is set on the generator (see [Wave Generators](#wave-generators)):
 
 ```ts
-water.material.foamAmount = 1;
-water.material.foamFalloff = 1.5;
+waves.foamWidth = 1.2;    // how folded a crest has to be before it foams
+waves.foamContrast = 7.2; // higher keeps the foam to the crests breaking hardest
 water.material.foamColor = new Vector3(0.92, 0.95, 0.97);
 ```
 
 | Property | Meaning |
 | --- | --- |
-| `foamAmount` | Scales the folding amount into a coverage fraction. 0 disables crest foam |
-| `foamFalloff` | A power applied to the coverage. Above 1 it pushes light folding toward no foam at all, so only a genuinely broken crest shows - which is what keeps a windy sea from turning uniformly white |
+| `foamWidth` (wave generator) | How folded the surface has to be before it foams. Higher lets gentler crests foam too and spreads the white over more of the sea |
+| `foamContrast` (wave generator) | How tightly the foam keeps to the crests breaking hardest. Raising it is what keeps a windy sea from turning uniformly white |
 | `foamColor` | Diffuse albedo of the foam, shared with shoreline foam. Slightly off-white and slightly blue (water plus air); a pure white one reads as snow |
+
+Every kind of foam - on the crests, in their trails, on the shore and in the wakes of [Water Interaction](#water-interaction) - is a density that the material cuts from the foam texture the same way, so the same density looks the same whatever made it. How much foam each kind makes is set where it is made: `foamWidth` / `foamContrast` and `foamTrailStrength` for the open water, `shoreWaveFoamStrength` / `shoreWaveShallowFoamStrength` for the shore, `interaction.foamAmount` for wakes.
 
 Foam left by breaking crests on open water does not vanish at once; it drifts with the wind and fades:
 
@@ -309,7 +311,7 @@ waves.foamContrast = 1.5;
 water.waveGenerator = waves;
 ```
 
-`FFTWaveGenerator` allocates GPU resources and is more suitable for wide ocean surfaces than small pools. Its spectrum is built from three cascades whose sizes follow the wind speed (`getWaveLength` reports them), each with its own `setWaveStrength` / `setWaveCroppiness`; `foamWidth` / `foamContrast` control foam width and contrast. It works on WebGPU and WebGL2 (with half-float color-buffer support); on other devices the water silently falls back to flat - no waves.
+`FFTWaveGenerator` allocates GPU resources and is more suitable for wide ocean surfaces than small pools. Its spectrum is built from three cascades whose sizes follow the wind speed (`getWaveLength` reports them), each with its own `setWaveStrength` / `setWaveCroppiness`; `foamWidth` / `foamContrast` set how readily its crests foam (see [Crest Foam](#crest-foam)). It works on WebGPU and WebGL2 (with half-float color-buffer support); on other devices the water silently falls back to flat - no waves.
 
 ## Sampling the Water Surface
 
@@ -362,7 +364,7 @@ A disturber injects the change in the water column its shape displaces since the
 
 The window follows the water the camera is looking at by default (`followMode: 'camera'`), can follow a node (`'node'` with `followNode`) for a first-person view, or stay put (`'fixed'` with `center`) for a pool or a pond. A band inside the window edge absorbs outgoing waves so the edge never shows; the `interaction` debug output shows the field on its own and dims everything outside the window.
 
-Disturbances also lay down foam - where a shape moves, where a stone lands, along the steep fast crests of the field's own waves - which fades at `foamDecay` and is drawn with the same look as the crest and shoreline foam. `interaction.foamAmount` is the coverage made per second where the water is churned to the full, default 3, and 0 turns this foam off; `foamDecay` (default 0.6, in 1/s) sets how fast it fades.
+Disturbances also lay down foam - where a shape moves, where a stone lands, along the steep fast crests of the field's own waves - which fades at `foamDecay` and is drawn with the same look as the crest and shoreline foam. `interaction.foamAmount` is the coverage made per second where the water is churned to the full, default 10, and 0 turns this foam off; `foamDecay` (default 0.6, in 1/s) sets how fast it fades.
 
 The field needs a filterable float or half-float render target; `interaction.isOk()` reports whether the device has one, and the water falls back to the wave generator alone when it does not. Tutorial `tut-75` drives a boat through the field and floats a buoy on the result.
 

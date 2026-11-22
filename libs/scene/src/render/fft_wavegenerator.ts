@@ -346,7 +346,12 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       this.paramsChanged();
     }
   }
-  /** Gets the foam width */
+  /**
+   * How folded the surface has to be before it foams: the Jacobian determinant
+   * below which foam appears, 1 being flat water and 0 a crest folding over.
+   * Higher lets gentler crests foam too, spreading the foam; lower keeps it to
+   * the most sharply breaking crests.
+   */
   get foamWidth() {
     return this._params.foamParams.x;
   }
@@ -356,7 +361,11 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       this.paramsChanged();
     }
   }
-  /** Gets the foam contrast */
+  /**
+   * Exponent on how far a crest is folded past {@link foamWidth}: higher keeps
+   * the foam to the crests breaking hardest, so a windy sea does not turn
+   * uniformly white; lower spreads it over more of each crest.
+   */
   get foamContrast() {
     return this._params.foamParams.y;
   }

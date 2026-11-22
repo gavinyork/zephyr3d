@@ -212,7 +212,8 @@ function buildOceanScene() {
   waves.setWaveCroppiness(1, -2);
   waves.setWaveCroppiness(2, -1.4);
   waves.foamWidth = 1.1;
-  waves.foamContrast = 3;
+  // The power the foam used to be raised to (1.2) folded into the generator's own
+  waves.foamContrast = 3.6;
   water.waveGenerator = waves;
 
   water.absorption = new Vector3(0.4, 0.14, 0.09);
@@ -223,8 +224,6 @@ function buildOceanScene() {
   water.subsurfaceIntensity = 0.5;
   water.subsurfaceCrestHeight = 1.5;
   water.sunScatteringIntensity = 0.4;
-  water.foamAmount = 0.5;
-  water.foamFalloff = 1.2;
   // The wall foam rides on the shore waves, which need the scene field; a low
   // surf, as the rocks and the pillar are too steep for it to break on
   water.shoreWaveHeight = 0.1;
@@ -328,8 +327,6 @@ function buildPoolScene() {
   water.refractionScale = 1;
   water.subsurfaceIntensity = 0.5;
   water.subsurfaceCrestHeight = 1.5;
-  water.foamAmount = 0.3;
-  water.foamFalloff = 1.8;
 
   water.causticsEnabled = true;
   water.causticsDepth = 3;

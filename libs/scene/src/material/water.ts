@@ -374,8 +374,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private readonly _sunScatterParams: Vector4;
   private _refractionBlur: number;
   private _cheapRefractionDepth: number;
-  private _foamAmount: number;
-  private _foamFalloff: number;
   private readonly _foamColor: Vector3;
   private readonly _foamParams: Vector4;
   private _foamFeather: number;
@@ -436,8 +434,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._sunScatterParams = new Vector4();
     this._refractionBlur = 1;
     this._cheapRefractionDepth = 1;
-    this._foamAmount = 1;
-    this._foamFalloff = 1.5;
     this._foamColor = new Vector3(0.92, 0.95, 0.97);
     this._foamParams = new Vector4();
     // Foam look defaults
@@ -908,26 +904,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this.uniformChanged();
     }
   }
-  /** Scale from the generator's fold measure to foam coverage, 0 to disable. */
-  get foamAmount() {
-    return this._foamAmount;
-  }
-  set foamAmount(val: number) {
-    if (val !== this._foamAmount) {
-      this._foamAmount = Math.max(0, val);
-      this.uniformChanged();
-    }
-  }
-  /** Power applied to foam coverage before scaling. Above 1 restricts foam to broken crests. */
-  get foamFalloff() {
-    return this._foamFalloff;
-  }
-  set foamFalloff(val: number) {
-    if (val !== this._foamFalloff) {
-      this._foamFalloff = Math.max(0.01, val);
-      this.uniformChanged();
-    }
-  }
   /** Diffuse albedo of the foam. */
   get foamColor() {
     return this._foamColor;
@@ -1249,7 +1225,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       // (intensity, crest absorption height in m, 0, 0)
       scope.subsurfaceParams = pb.vec4().uniform(2);
       scope.subsurfaceTint = pb.vec3().uniform(2);
-      // (coverage scale, coverage falloff, 0, 0)
+      // (wall foam strength, 0, 0, 0)
       scope.foamShadingParams = pb.vec4().uniform(2);
       scope.foamColor = pb.vec3().uniform(2);
       // (white foam feather, foam normal strength, bubble coverage, bubble depth in m)
@@ -2441,27 +2417,25 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.underwaterEye,
           this.sigmaV
         );
-        // Foam density from the wave generator: crests, wakes, breaking shore waves
-        this.$l.crestDensity = pb.clamp(
-          pb.mul(pb.pow(pb.clamp(this.foamFactor, 0, 1), this.foamShadingParams.y), this.foamShadingParams.x),
-          0,
-          1
-        );
+        // Foam density from the wave generator: crests, wakes, breaking shore waves.
+        // Cut from the texture as it is: how much foam each source makes is set
+        // at the source, so a density looks the same whichever source made it.
+        this.$l.crestDensity = pb.clamp(this.foamFactor, 0, 1);
         this.$l.crestWhite = this.waterWhiteFoam(this.crestDensity, this.foamSample, this.foamLookParams.x);
         // Wall foam, cut from the same texture by its own density: whole against
         // the wall, fraying as it thins. Its strength scales opacity after the cut.
         this.$l.wallDensity = pb.clamp(this.wallFoam, 0, 1);
         this.$l.wallCut = this.waterWhiteFoam(this.wallDensity, this.foamSample, this.foamLookParams.x);
-        this.$l.wallWhite = pb.mul(this.wallCut.x, this.foamShadingParams.z);
+        this.$l.wallWhite = pb.mul(this.wallCut.x, this.foamShadingParams.x);
         // The two layers combine as independent covers.
         this.$l.foam = pb.sub(1, pb.mul(pb.sub(1, this.crestWhite.x), pb.sub(1, this.wallWhite)));
         this.$l.foamGrad = pb.add(
           pb.mul(this.crestWhite.yz, pb.sub(1, this.wallWhite)),
-          pb.mul(this.wallCut.yz, this.foamShadingParams.z, pb.sub(1, this.crestWhite.x))
+          pb.mul(this.wallCut.yz, this.foamShadingParams.x, pb.sub(1, this.crestWhite.x))
         );
         this.$l.bubbleDensity = pb.sub(
           1,
-          pb.mul(pb.sub(1, this.crestDensity), pb.sub(1, pb.mul(this.wallDensity, this.foamShadingParams.z)))
+          pb.mul(pb.sub(1, this.crestDensity), pb.sub(1, pb.mul(this.wallDensity, this.foamShadingParams.x)))
         );
         // Normal of the white foam's relief: the cut's slope times a step of a
         // quarter texel per metre of view depth, which keeps the relief at a
@@ -2525,11 +2499,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         if (hasGroundFoam) {
           this.$if(pb.greaterThan(this.groundFoamDensity, 1e-3), function () {
             this.$l.groundFoamWhite = this.waterWhiteFoam(
-              pb.clamp(
-                pb.mul(pb.pow(this.groundFoamDensity, this.foamShadingParams.y), this.foamShadingParams.x),
-                0,
-                1
-              ),
+              pb.clamp(this.groundFoamDensity, 0, 1),
               this.groundFoamSample,
               this.foamLookParams.x
             );
@@ -2946,9 +2916,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       bindGroup.setValue('subsurfaceParams', this._subsurfaceParams);
       bindGroup.setValue('subsurfaceTint', this._subsurfaceTint);
       this._foamParams.setXYZW(
-        this._foamAmount,
-        this._foamFalloff,
         this._shoreWaves.height > 0 ? this._shoreWaves.wallFoamStrength! : 0,
+        0,
+        0,
         0
       );
       bindGroup.setValue('foamShadingParams', this._foamParams);

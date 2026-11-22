@@ -366,8 +366,6 @@ function buildScene() {
   water.refractionScale = 1;
   water.subsurfaceIntensity = 0.5;
   water.subsurfaceCrestHeight = 1.5;
-  water.foamAmount = 0.3;
-  water.foamFalloff = 1.8;
 
   water.causticsEnabled = true;
   water.causticsDepth = 3;

@@ -359,8 +359,6 @@ function buildScene() {
   water.subsurfaceIntensity = 0.5;
   water.subsurfaceCrestHeight = 1.5;
   water.sunScatteringIntensity = 0.4;
-  water.foamAmount = 1;
-  water.foamFalloff = 1.5;
 
   // Markers are placed on a lattice centred on the water's own origin, which is
   // also where the reading is taken: the sampler is handed world positions, not
