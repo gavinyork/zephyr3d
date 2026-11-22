@@ -344,17 +344,17 @@ function buildScene() {
   water.gridScale = 1;
   water.animationSpeed = 1;
   water.causticsIntensity = 1.5;
-  water.causticsRange = 60;
-  water.causticsDepth = 6;
-  water.causticsFadeDistance = 15;
+  water.causticsRange = 90;
+  water.causticsDepth = 3;
+  water.causticsFadeDistance = 30;
   water.absorptionScale = 2.5;
 
   const waves = new FFTWaveGenerator();
-  waves.wind = new Vector2(1, 1);
-  waves.setWaveStrength(0, 0.4);
-  waves.setWaveStrength(1, 0.4);
-  waves.setWaveStrength(2, 0.02);
-  waves.setWaveCroppiness(0, -1.5);
+  waves.wind = new Vector2(4, 2);
+  waves.setWaveStrength(0, 0.1);
+  waves.setWaveStrength(1, 0.05);
+  waves.setWaveStrength(2, 0.01);
+  waves.setWaveCroppiness(0, -3.5);
   waves.setWaveCroppiness(1, -1.2);
   waves.setWaveCroppiness(2, -0.5);
   water.waveGenerator = waves;

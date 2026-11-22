@@ -90,11 +90,7 @@
   </head>
   <body>
     <canvas id="my-canvas"></canvas>
-    <div id="ui" aria-label="Subsurface scattering options">
-      <label>
-        <span>Subsurface</span>
-        <input id="sss-check" type="checkbox" checked />
-      </label>
+    <div id="ui" aria-label="Subsurface scattering options" style="display: none">
       <label>
         <span>Profile</span>
         <select id="preset-select"></select>
@@ -104,7 +100,6 @@
         <select id="debug-select"></select>
       </label>
       <div class="note" id="backend-note"></div>
-      <div class="note">Unchecking Subsurface swaps in a plain PBR material of the same colour.</div>
       <div class="note">Left drag: orbit. Wheel: zoom.</div>
     </div>
     <script type="module" src="js/tut-94.js"></script>

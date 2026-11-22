@@ -150,7 +150,7 @@ myApp.ready().then(function () {
   const note = document.querySelector('#backend-note');
   modeSelect.value = ring.sdfMode;
   modeSelect.addEventListener('change', () => {
-    ring.sdfMode = modeSelect.value;
+    ring.sdfMode = /** @type {import('@zephyr3d/scene').MeshSDFMode} */ (modeSelect.value);
   });
   // #region budget
   // Clipmap bricks composited per frame; scene.sdf.global is null on WebGL2

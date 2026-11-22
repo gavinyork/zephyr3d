@@ -20,20 +20,9 @@
 
 <div class="showcase" case="tut-94"></div>
 
-场景按真实尺寸搭建，单位是米：一个 20 厘米的球代替头部，一盏掠射的主光让明暗交界线从中间穿过，一根细杆
-在受光面上投下一道硬边阴影。勾选 **Subsurface** 时，这道阴影的边缘带上一圈渗进阴影里的红边；取消勾选，
-同样的表面换成普通 PBR 材质，边缘就是生硬的灰色。头部旁边那块 5 毫米厚的圆片只被身后的光源照亮，光是
-透过来的。
-
 设置材质只要三行：
 
 <<< @/../src/tut-94/main.js#material
-
-**没有需要打开的开关。** 渲染器每帧检查是否正在绘制不透明的 `SSSMaterial`，只在这一帧启用 `PostSSS`，
-所以画面里没有这种材质时这个 pass 没有开销。反过来，要关掉效果就得换一个材质来画，示例里的复选框就是
-这样做的：
-
-<<< @/../src/tut-94/main.js#toggle
 
 ## Profile：光能走多远
 
@@ -109,8 +98,6 @@
 - `light.transmission = true`（默认 `false`）；
 - 该光源投射阴影（`light.castShadow = true`），因为光穿过的厚度是每帧从它的阴影贴图测出来的；
 - 这一帧画了 `SSSMaterial`。
-
-<<< @/../src/tut-94/main.js#transmission
 
 厚度不需要手工制作，但阴影贴图的分辨率决定了能分辨多薄的结构，所以 `shadowDistance`（或光源的
 range）要尽量收紧在主体周围。在以米为单位的场景里、`extinctionScale` 为 1 时，超过约 5 厘米厚的材料就

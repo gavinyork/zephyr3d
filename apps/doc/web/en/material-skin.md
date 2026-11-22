@@ -23,22 +23,9 @@ concentrated where the lighting changes abruptly — shadow edges above all.
 
 <div class="showcase" case="tut-94"></div>
 
-The scene is life-size, in metres: a 20 cm sphere stands in for a head, a grazing key light puts the
-terminator down its middle, and a thin rod throws a hard-edged shadow across the lit side. With
-**Subsurface** checked, the edges of that shadow pick up a red fringe that bleeds into the shadow; uncheck it
-and the same surface under a plain PBR material shows a hard grey edge. The 5 mm disc beside the head is lit
-only by a light behind it, shining through.
-
 Setting up the material takes three lines:
 
 <<< @/../src/tut-94/main.js#material
-
-**There is no switch to turn on.** Every frame the renderer checks whether an opaque `SSSMaterial` is being
-drawn and enables `PostSSS` for that frame only, so the pass costs nothing while no such material is
-visible. It follows that the way to turn the effect off is to draw a different material, which is what the
-example's checkbox does:
-
-<<< @/../src/tut-94/main.js#toggle
 
 ## Profiles: how far light travels
 
@@ -121,8 +108,6 @@ Transmission is opt-in per light and needs three things:
 - the light casts shadows (`light.castShadow = true`), because the thickness the light travels through is
   measured every frame from its shadow map;
 - an `SSSMaterial` is drawn that frame.
-
-<<< @/../src/tut-94/main.js#transmission
 
 Nothing has to be authored, but the shadow map's resolution limits how thin a feature can be resolved, so
 keep `shadowDistance` (or the light's range) tight around the subject. In a metre-scale scene with

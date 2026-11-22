@@ -1042,15 +1042,15 @@ function getNodeClassName(node: SceneNode): NodeClass {
                     ? 'ParticleSystem'
                     : node.isParticleEmitter()
                       ? 'ParticleEmitter'
-                    : node.isWater()
-                      ? 'Water'
-                      : node instanceof PerspectiveCamera
-                        ? 'PerspectiveCamera'
-                        : node instanceof OrthoCamera
-                          ? 'OrthoCamera'
-                          : node.isCamera()
-                            ? 'Camera'
-                            : 'SceneNode';
+                      : node.isWater()
+                        ? 'Water'
+                        : node instanceof PerspectiveCamera
+                          ? 'PerspectiveCamera'
+                          : node instanceof OrthoCamera
+                            ? 'OrthoCamera'
+                            : node.isCamera()
+                              ? 'Camera'
+                              : 'SceneNode';
 }
 
 function vec3ToArray(vec: { x: number; y: number; z: number }): [number, number, number] {

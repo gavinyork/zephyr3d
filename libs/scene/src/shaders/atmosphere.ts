@@ -408,8 +408,6 @@ export function groundBounce(
 }
 
 /**
- * @internal
- *
  * Single scattering along a view ray, plus multiple scattering from the LUT.
  *
  * @param withGround - Stop the ray at the planet ground.
@@ -420,7 +418,7 @@ export function groundBounce(
  */
 /**
  * Cloud shadow map a sky view integration samples, see {@link getSkyView}.
- * @internal
+ * @public
  */
 export interface AtmosphereCloudShadowBindings {
   /** The map: (front depth km, mean extinction 1/m, max optical depth) */

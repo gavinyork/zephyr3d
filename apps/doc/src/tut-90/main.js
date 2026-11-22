@@ -245,7 +245,7 @@ myApp.ready().then(function () {
   const shapeSelect = document.querySelector('#shape-select');
   shapeSelect.value = particles.shape.type;
   shapeSelect.addEventListener('change', function () {
-    particles.shape.type = shapeSelect.value;
+    particles.shape.type = /** @type {import('@zephyr3d/scene').ParticleShapeType} */ (shapeSelect.value);
   });
   /** @type {HTMLSelectElement} */
   const behaviorSelect = document.querySelector('#behavior-select');
@@ -256,7 +256,7 @@ myApp.ready().then(function () {
   const blendSelect = document.querySelector('#blend-select');
   blendSelect.value = material.blendMode;
   blendSelect.addEventListener('change', function () {
-    material.blendMode = blendSelect.value;
+    material.blendMode = /** @type {import('@zephyr3d/scene').BlendMode} */ (blendSelect.value);
   });
 
   // #region worldspace
