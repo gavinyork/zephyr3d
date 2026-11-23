@@ -178,21 +178,19 @@ water.material.refractionBlur = 1;
 
 ## 波峰泡沫
 
-波峰泡沫来自破碎浪尖的水面折叠。`waveGenerator` 测量折叠并把它换算成泡沫浓度，所以浪尖多容易起泡沫在生成器上设置（见[波浪生成器](#波浪生成器)）：
+波峰泡沫来自破碎浪尖的水面折叠，由 `waveGenerator` 提供折叠数据，材质将其映射为覆盖率。
 
 ```ts
-waves.foamWidth = 1.2;    // 浪尖要折叠到什么程度才起泡沫
-waves.foamContrast = 7.2; // 越高，泡沫越只留在破碎最猛的浪尖上
+water.material.foamAmount = 1;
+water.material.foamFalloff = 1.5;
 water.material.foamColor = new Vector3(0.92, 0.95, 0.97);
 ```
 
 | 参数 | 含义 |
 | --- | --- |
-| `foamWidth`（波浪生成器） | 水面折叠到什么程度才起泡沫。越高，较缓的浪尖也起泡沫，白色铺得越开 |
-| `foamContrast`（波浪生成器） | 泡沫多集中在破碎最猛的浪尖上。调高它可以避免强风海面整体发白 |
+| `foamAmount` | 折叠量到覆盖率的缩放，0 关闭波峰泡沫 |
+| `foamFalloff` | 覆盖率的幂次。大于 1 会把轻微折叠压向无泡沫，只让真正破碎的浪尖显示，避免强风海面整体发白 |
 | `foamColor` | 泡沫的漫反射反照率，与近岸泡沫共用。略偏白偏蓝（水加空气），纯白会读起来像雪 |
-
-所有泡沫——浪尖上的、浪后拖尾的、近岸的，以及[水体交互](#水体交互)的尾迹——都是一个浓度，材质用同一种方式从泡沫纹理上裁出白色，同样的浓度不论来源看起来都一样。每种泡沫生成多少在它的源头设置：开阔水面用 `foamWidth` / `foamContrast` 和 `foamTrailStrength`，近岸用 `shoreWaveFoamStrength` / `shoreWaveShallowFoamStrength`，尾迹用 `interaction.foamAmount`。
 
 开阔海面上破碎浪尖留下的泡沫不会立刻消失，而是随风漂移、逐渐消散：
 
@@ -311,7 +309,7 @@ waves.foamContrast = 1.5;
 water.waveGenerator = waves;
 ```
 
-`FFTWaveGenerator` 会分配 GPU 资源，更适合大范围海面而不是小水池。它的波谱由三层级联构成，各层尺寸随风速自动确定（可用 `getWaveLength` 读取），每层可用 `setWaveStrength` / `setWaveCroppiness` 调节，`foamWidth` / `foamContrast` 决定浪尖多容易起泡沫（见[波峰泡沫](#波峰泡沫)）。它在 WebGPU 和 WebGL2（需支持半浮点颜色缓冲）下可用，其余设备会静默回退到没有波浪的平面。
+`FFTWaveGenerator` 会分配 GPU 资源，更适合大范围海面而不是小水池。它的波谱由三层级联构成，各层尺寸随风速自动确定（可用 `getWaveLength` 读取），每层可用 `setWaveStrength` / `setWaveCroppiness` 调节，`foamWidth` / `foamContrast` 控制浮沫的宽度与对比度。它在 WebGPU 和 WebGL2（需支持半浮点颜色缓冲）下可用，其余设备会静默回退到没有波浪的平面。
 
 ## 查询水面高度
 
@@ -364,7 +362,7 @@ interaction.addDisturber(piling);
 
 窗口默认对准相机所看的那片水（`followMode: 'camera'`），也可以跟随某个节点（`'node'` 配合 `followNode`，适合第一人称）或固定不动（`'fixed'` 配合 `center`，适合泳池和小池塘）。窗口边缘内侧有一圈吸收带，向外传播的波在那里衰减，边缘不会露出来；调试输出 `interaction` 单独显示该场，并把窗口外压暗。
 
-扰动同时会留下泡沫：物体经过处、落石处、以及场自身陡而快的浪脊上。泡沫按 `foamDecay` 衰减，与波峰泡沫、近岸泡沫用同一套着色。`interaction.foamAmount` 是水被充分搅动处每秒生成的覆盖率，默认 10，0 关闭这部分泡沫；`foamDecay`（默认 0.6，单位 1/s）决定它消散得多快。
+扰动同时会留下泡沫：物体经过处、落石处、以及场自身陡而快的浪脊上。泡沫按 `foamDecay` 衰减，与波峰泡沫、近岸泡沫用同一套着色。`interaction.foamAmount` 是水被充分搅动处每秒生成的覆盖率，默认 3，0 关闭这部分泡沫；`foamDecay`（默认 0.6，单位 1/s）决定它消散得多快。
 
 该场需要可过滤的浮点或半浮点渲染目标；`interaction.isOk()` 报告设备是否支持，不支持时水面退回到只用波浪生成器。教程 `tut-75` 演示了开船穿过该场并让浮标浮在叠加后的表面上。
 

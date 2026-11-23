@@ -766,6 +766,30 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set reflectionStrength(val) {
     this.material.reflectionStrength = val;
   }
+  /**
+   * How much of a folded texel reads as foam.
+   *
+   * Scales the wave generator's fold measure into a coverage fraction. 0
+   * disables foam.
+   */
+  get foamAmount() {
+    return this.material.foamAmount;
+  }
+  set foamAmount(val: number) {
+    this.material.foamAmount = val;
+  }
+  /**
+   * Falloff applied to foam coverage before it is scaled.
+   *
+   * Above 1 this pushes light folding towards no foam, so only broken crests
+   * show any.
+   */
+  get foamFalloff() {
+    return this.material.foamFalloff;
+  }
+  set foamFalloff(val: number) {
+    this.material.foamFalloff = val;
+  }
   /** Diffuse albedo of the foam. */
   get foamColor() {
     return this.material.foamColor;

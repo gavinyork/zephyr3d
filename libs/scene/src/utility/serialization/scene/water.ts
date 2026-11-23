@@ -117,8 +117,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
         },
         {
           name: 'FoamWidth',
-          description:
-            'How readily the wave crests foam: higher lets gentler crests foam too and spreads the white over more of the sea; lower keeps the foam to the most sharply breaking crests.',
+          description: 'Width of foam bands generated on the wave crests',
           type: 'float',
           default: 1.2,
           options: { animatable: true, minValue: 0, maxValue: 10 },
@@ -131,8 +130,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
         },
         {
           name: 'FoamContrast',
-          description:
-            'How tightly the foam keeps to the crests breaking hardest: higher leaves foam on only the sharpest crests, so a windy sea does not turn uniformly white; lower spreads it over more of each crest.',
+          description: 'Contrast of the foam pattern on FFT waves',
           type: 'float',
           default: 7.2,
           options: { animatable: true, minValue: 0, maxValue: 10 },
@@ -239,8 +237,7 @@ export function getGerstnerWaveGeneratorClass(): SerializableClass {
         },
         {
           name: 'FoamWidth',
-          description:
-            'How readily the wave crests foam: higher lets gentler crests foam too and spreads the white over more of the sea; lower keeps the foam to the most sharply breaking crests.',
+          description: 'Width of foam bands generated on the wave crests',
           type: 'float',
           default: 1.2,
           options: { animatable: true, minValue: 0, maxValue: 10 },
@@ -253,8 +250,7 @@ export function getGerstnerWaveGeneratorClass(): SerializableClass {
         },
         {
           name: 'FoamContrast',
-          description:
-            'How tightly the foam keeps to the crests breaking hardest: higher leaves foam on only the sharpest crests, so a windy sea does not turn uniformly white; lower spreads it over more of each crest.',
+          description: 'Contrast of the foam pattern on Gerstner waves',
           type: 'float',
           default: 7.2,
           options: { animatable: true, minValue: 0, maxValue: 10 },
@@ -552,6 +548,7 @@ const WATER_PROPERTY_LAYOUT: { group: string; open?: boolean; props: [string, st
   {
     group: 'Foam',
     props: [
+      ['FoamAmount', 'Wave Foam'],
       ['FoamColor', 'Color'],
       ['FoamTexture', 'Texture'],
       ['FoamTextureSize', 'Texture Size'],
@@ -561,6 +558,7 @@ const WATER_PROPERTY_LAYOUT: { group: string; open?: boolean; props: [string, st
   {
     group: 'Foam/Look',
     props: [
+      ['FoamFalloff', 'Wave Foam Falloff'],
       ['FoamNormalStrength', 'Relief'],
       ['FoamBubbleColor', 'Bubble Color'],
       ['FoamBubbleCoverage', 'Bubbles'],
@@ -1195,6 +1193,37 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             },
             set(this: Water, value) {
               this.material.sunScatteringIntensity = value.num[0];
+            }
+          },
+          {
+            name: 'FoamAmount',
+            description:
+              'Coverage of the foam on breaking wave crests, mapped from the folding the wave generator reports. 0 disables crest foam.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 4 },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamAmount;
+            },
+            set(this: Water, value) {
+              this.material.foamAmount = value.num[0];
+            }
+          },
+          {
+            name: 'FoamFalloff',
+            description:
+              'Falloff applied to crest foam coverage. Above 1 pushes light folding towards no foam at all, so only a genuinely broken crest shows - which is what keeps a windy sea from turning uniformly white.',
+            type: 'float',
+            default: 1.5,
+            options: { animatable: true, minValue: 0.01, maxValue: 8 },
+            isHidden(this: Water) {
+              return this.material.foamAmount <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamFalloff;
+            },
+            set(this: Water, value) {
+              this.material.foamFalloff = value.num[0];
             }
           },
           {
@@ -1989,9 +2018,9 @@ export function getWaterInteractionClass(): SerializableClass {
         {
           name: 'FoamAmount',
           description:
-            'How much foam wakes and splashes make: higher whitens the water beside a moving hull and around a splash sooner and more thickly, lower leaves a thinner, lacier trail; 0 makes none.',
+            'Rate foam is made at where the water is churned to the full, in coverage per second; 0 disables the foam',
           type: 'float',
-          default: 10,
+          default: 3,
           options: { animatable: true, minValue: 0, maxValue: 30 },
           get(this: WaterInteraction, value) {
             value.num[0] = this.foamAmount;
