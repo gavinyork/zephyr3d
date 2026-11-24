@@ -1359,7 +1359,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           {
             name: 'FoamTextureSize',
             description:
-              'How large the foam pattern is on the water, in metres per repeat of the foam texture: larger values give bigger clumps and holes.',
+              'How large the foam pattern is on the water near the view, in metres per repeat of the foam texture: larger values give bigger clumps and holes. Farther off the pattern grows in steps of two so it stays crisp.',
             type: 'float',
             default: 4,
             options: { animatable: true, minValue: 0.01, maxValue: 50 },

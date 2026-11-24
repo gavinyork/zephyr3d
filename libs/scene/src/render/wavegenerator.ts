@@ -77,10 +77,11 @@ export interface WaveGenerator extends IDisposable {
    * @param scope - Global scope of the shader program.
    * @param xz - XZ position.
    * @param vertexNormal - Vertex normal.
-   * @param foamSample - Optional inout vec3: the foam texture as the material
-   *   sampled it here, (value, slope along x, slope along z). A generator that
-   *   carries its foam on texture coordinates of its own (moving with its
-   *   waves) blends its sample in by its share of the foam.
+   * @param foamFlow - Optional inout vec2: velocity in metres per second the
+   *   material carries its foam texture at here, entering as its drift. A
+   *   generator that carries its foam with its water blends its water's
+   *   velocity in by its share of the foam; the material reads the texture
+   *   along it, so the foam's pattern travels as the foam does.
    * @param xzGrad - Optional vec4: screen derivatives of `xz`, (dpdx, dpdy).
    *   A generator filters out the waves too short for the pixel by them, which
    *   would alias into speckle; {@link WaveGenerator.calcUnresolvedSlopeVariance}
@@ -92,7 +93,7 @@ export interface WaveGenerator extends IDisposable {
     scope: PBInsideFunctionScope,
     xz: PBShaderExp,
     vertexNormal: PBShaderExp,
-    foamSample?: PBShaderExp,
+    foamFlow?: PBShaderExp,
     xzGrad?: PBShaderExp
   ): PBShaderExp;
   /**

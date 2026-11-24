@@ -175,3 +175,173 @@ export function foamTexelSize(scope: PBInsideFunctionScope, tex: PBShaderExp, uv
   const pb = scope.$builder;
   return pb.div(1, pb.mul(uvScale, pb.float(pb.textureDimensions(tex, 0).x)));
 }
+
+/**
+ * Seconds each of the two samples of a flowing foam pattern slides along the
+ * flow before it is set back, half of it apart, faded across so neither jump
+ * shows.
+ * @internal
+ */
+export const FOAM_FLOW_PERIOD = 2;
+/**
+ * Mip level of the foam texture past which the pattern takes the next octave,
+ * twice the size. The foam is cut from the texture's grey levels, which fix
+ * how much of it a density uncovers (see FOAM_LEVELS); filtering narrows them
+ * towards the mean, so a far pattern read at a high mip level would show no
+ * foam below a density and solid foam above it. The default texture holds its
+ * coverage to within a hundredth through mip 1, between which and mip 0 the
+ * nearer octave is read, and loses a third of its sparse foam at mip 2.
+ */
+const FOAM_OCTAVE_LOD = 0;
+/** Last octave of the foam pattern, which bounds its uv however far the pixel's footprint. */
+const FOAM_MAX_OCTAVE = 16;
+
+/**
+ * The foam texture as read at a point, ready to be cut by a density: up to four
+ * samples, each its value and slopes along world x and z per metre, and the
+ * weights they blend by, summing to 1. A cut is taken of each sample before
+ * the blend (see {@link sampleFoamPattern}). Each a vec4 shader variable, a
+ * sample per component.
+ * @internal
+ */
+export interface FoamPattern {
+  value: PBShaderExp;
+  slopeX: PBShaderExp;
+  slopeZ: PBShaderExp;
+  weight: PBShaderExp;
+}
+
+/**
+ * Declares the variables of a {@link FoamPattern} in a scope, as no foam: every weight 0.
+ * @internal
+ */
+export function declareFoamPattern(scope: PBInsideFunctionScope, name: string): FoamPattern {
+  const pb = scope.$builder;
+  scope.$l[`${name}Value`] = pb.vec4(0);
+  scope.$l[`${name}SlopeX`] = pb.vec4(0);
+  scope.$l[`${name}SlopeZ`] = pb.vec4(0);
+  scope.$l[`${name}Weight`] = pb.vec4(0);
+  return {
+    value: scope[`${name}Value`],
+    slopeX: scope[`${name}SlopeX`],
+    slopeZ: scope[`${name}SlopeZ`],
+    weight: scope[`${name}Weight`]
+  };
+}
+
+/**
+ * Reads the foam texture at an undisplaced XZ into a {@link FoamPattern}.
+ *
+ * The cut by a density that reveals the foam is not linear, so samples are
+ * blended after it, never before: an average of two samples is narrower than
+ * either, and a cut of it uncovers less of the sparse foam and more of the
+ * dense. Two blends arise here.
+ *
+ * Flow: the texture travels at `flow`, which the foam field takes from the
+ * water. It drifts at `drift` without end, and is slid on at the rest,
+ * `flow - drift`, by two samples each set back every FOAM_FLOW_PERIOD seconds,
+ * half of it apart, faded across. Where the flow is the drift the two are one
+ * sample (Vlachos, "Water Flow in Portal 2", SIGGRAPH 2010; as Crest carries
+ * its foam).
+ *
+ * Distance: the pattern repeats over 2^k times its size at octave k, chosen so
+ * the texture is read near FOAM_OCTAVE_LOD whatever the pixel's footprint, and
+ * blended into octave k + 1 over the octave before it takes over (as Crest
+ * scales its foam with its LOD cascades). The footprint is the pixel's longer
+ * axis, from which the sampler picks its mip level.
+ *
+ * @param tex - The foam texture, its value in red. A uniform of the program:
+ *   every call in one program must pass the same one.
+ * @param xz - Undisplaced XZ position.
+ * @param xzGrad - Screen derivatives of `xz`, (dpdx, dpdy); the samples are
+ *   filtered with them, so this can be called in non-uniform control flow.
+ * @param uvScale - uv per metre of the texture at octave 0.
+ * @param flow - Velocity the texture travels at, metres per second.
+ * @param drift - Velocity it travels at without end, metres per second.
+ * @param time - Clock in seconds.
+ * @param out - The pattern to write, see {@link declareFoamPattern}.
+ * @internal
+ */
+export function sampleFoamPattern(
+  scope: PBInsideFunctionScope,
+  tex: PBShaderExp,
+  xz: PBShaderExp,
+  xzGrad: PBShaderExp,
+  uvScale: PBShaderExp,
+  flow: PBShaderExp,
+  drift: PBShaderExp,
+  time: PBShaderExp,
+  out: FoamPattern
+) {
+  const pb = scope.$builder;
+  pb.func(
+    'zFoamPattern',
+    [
+      pb.vec2('xz'),
+      pb.vec4('xzGrad'),
+      pb.float('uvScale'),
+      pb.vec2('flow'),
+      pb.vec2('drift'),
+      pb.float('time'),
+      pb.vec4('value').out(),
+      pb.vec4('slopeX').out(),
+      pb.vec4('slopeZ').out(),
+      pb.vec4('weight').out()
+    ],
+    function () {
+      // Octave: the mip level octave 0 would be read at, past FOAM_OCTAVE_LOD
+      this.$l.footprint = pb.max(pb.max(pb.length(this.xzGrad.xy), pb.length(this.xzGrad.zw)), 1e-6);
+      this.$l.octave = pb.clamp(
+        pb.sub(
+          pb.log2(pb.mul(this.footprint, this.uvScale, pb.float(pb.textureDimensions(tex, 0).x))),
+          FOAM_OCTAVE_LOD
+        ),
+        0,
+        FOAM_MAX_OCTAVE
+      );
+      this.$l.level = pb.floor(this.octave);
+      this.$l.blend = pb.sub(this.octave, this.level);
+      this.$l.scaleNear = pb.mul(this.uvScale, pb.exp2(pb.neg(this.level)));
+      this.$l.scaleFar = pb.mul(this.scaleNear, 0.5);
+      // Flow: the two samples' offsets along the rest of the flow, and their weights
+      const half = FOAM_FLOW_PERIOD * 0.5;
+      this.$l.offset1 = pb.mod(this.time, FOAM_FLOW_PERIOD);
+      this.$l.offset2 = pb.mod(pb.add(this.time, half), FOAM_FLOW_PERIOD);
+      this.$l.rest = pb.sub(this.flow, this.drift);
+      this.$l.phase = this.$choice(
+        pb.equal(this.rest, pb.vec2(0)),
+        pb.vec2(1, 0),
+        pb.vec2(pb.sub(1, pb.abs(pb.sub(pb.div(this.offset1, half), 1))), 0)
+      );
+      this.phase.y = pb.sub(1, this.phase.x);
+      this.$l.drifted = pb.sub(this.xz, pb.mul(this.drift, this.time));
+      this.$l.pos1 = pb.sub(this.drifted, pb.mul(this.rest, this.offset1));
+      this.$l.pos2 = pb.sub(this.drifted, pb.mul(this.rest, this.offset2));
+      // Samples: (first, second) at the nearer octave, then at the farther;
+      // gathered here and written out once
+      this.$l.w = pb.vec4(pb.mul(this.phase, pb.sub(1, this.blend)), pb.mul(this.phase, this.blend));
+      this.$l.v = pb.vec4(0);
+      this.$l.gx = pb.vec4(0);
+      this.$l.gz = pb.vec4(0);
+      const slots: [string, string, string][] = [
+        ['x', 'pos1', 'scaleNear'],
+        ['y', 'pos2', 'scaleNear'],
+        ['z', 'pos1', 'scaleFar'],
+        ['w', 'pos2', 'scaleFar']
+      ];
+      for (const [c, pos, scale] of slots) {
+        this.$if(pb.greaterThan(this.w[c], 0), function () {
+          this.$l.s = sampleFoamTexture(this, tex, pb.mul(this[pos], this[scale]), this.xzGrad, this[scale]);
+          this.v[c] = this.s.x;
+          this.gx[c] = this.s.y;
+          this.gz[c] = this.s.z;
+        });
+      }
+      this.value = this.v;
+      this.slopeX = this.gx;
+      this.slopeZ = this.gz;
+      this.weight = this.w;
+    }
+  );
+  scope.zFoamPattern(xz, xzGrad, uvScale, flow, drift, time, out.value, out.slopeX, out.slopeZ, out.weight);
+}

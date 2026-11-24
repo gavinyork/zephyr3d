@@ -1631,22 +1631,22 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     scope: PBInsideFunctionScope,
     xz: PBShaderExp,
     vertexNormal: PBShaderExp,
-    foamSample?: PBShaderExp,
+    foamFlow?: PBShaderExp,
     footprint?: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     const params = [pb.vec2('xz'), pb.vec3('vn')];
     const args = [xz, vertexNormal];
-    if (foamSample) {
-      params.push(pb.vec3('fs').inout());
-      args.push(foamSample);
+    if (foamFlow) {
+      params.push(pb.vec2('fflow').inout());
+      args.push(foamFlow);
     }
     if (footprint) {
       params.push(pb.vec4('fp'));
       args.push(footprint);
     }
-    const funcName = `swCalcNormalAndFoam${foamSample ? 'S' : ''}${footprint ? 'F' : ''}`;
+    const funcName = `swCalcNormalAndFoam${foamFlow ? 'S' : ''}${footprint ? 'F' : ''}`;
     pb.func(funcName, params, function () {
       this.$l.dir = pb.vec4(0);
       this.$l.spacing = pb.float(0);
@@ -1658,7 +1658,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         this,
         this.xz,
         this.vn,
-        foamSample ? this.fs : undefined,
+        foamFlow ? this.fflow : undefined,
         footprint ? this.fp : undefined
       );
       this.$return(pb.vec4(that.tilt(this, this.nf.xyz, this.sw, this.dir), this.nf.w));

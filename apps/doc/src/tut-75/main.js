@@ -11,6 +11,8 @@ import {
   CylinderShape,
   BoxShape,
   SphereShape,
+  Primitive,
+  BoundingBox,
   PBRMetallicRoughnessMaterial,
   Water,
   WaterInteraction,
@@ -28,7 +30,14 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 const params = new URLSearchParams(location.search);
 
 const BOAT_SIZE = { sizeX: 1.6, sizeY: 1, sizeZ: 3.6 };
-const BOAT_MASS = 1500;
+/** A loaded boat. How deep it floats is set by its submerged fraction, below, not by the mass. */
+const BOAT_MASS = 2500;
+/**
+ * How far the hull pushes the water's surface down where it sits, in metres:
+ * about half its draft. The deeper and faster a hull goes, the harder it
+ * forces the water aside at its bow and stern, and the thicker its wake foams.
+ */
+const BOAT_DISPLACEMENT = 0.3;
 /** Thrust at full throttle, as an acceleration in m/s^2. Turned into a force by the mass. */
 const BOAT_ACCEL = 6;
 /** Rudder authority at full helm and full way on, as an angular acceleration in rad/s^2. */
@@ -70,9 +79,15 @@ myApp.ready().then(function () {
 
   // Things in the water. The boat and the buoy move, so they push water about;
   // the pilings do not, so they only block and reflect.
+  // The hull's footprint is its bounding box: the box's blunt ends push the
+  // water harder than a rounded footprint would, which is where a hull makes
+  // its bow wave and its wash. It floats: it displaces the same water however
+  // it bobs, so its wake comes from its way through the water alone, not from
+  // its pitching over the swell.
   const boatDisturber = new WaterDisturber(boat, 'box');
   boatDisturber.size = new Vector3(BOAT_SIZE.sizeX, BOAT_SIZE.sizeY, BOAT_SIZE.sizeZ);
-  boatDisturber.strength = 0.15;
+  boatDisturber.strength = BOAT_DISPLACEMENT;
+  boatDisturber.floating = true;
   interaction.addDisturber(boatDisturber);
   const buoyDisturber = new WaterDisturber(buoy, 'sphere');
   buoyDisturber.radius = BUOY_RADIUS;
@@ -97,8 +112,9 @@ myApp.ready().then(function () {
     node: boat,
     size: new Vector3(BOAT_SIZE.sizeX, BOAT_SIZE.sizeY, BOAT_SIZE.sizeZ),
     mass: BOAT_MASS,
-    // Riding high, as an empty hull does. Pushing this up sinks the boat deeper
-    // and makes it far wetter and slower to right itself.
+    // Loaded, so riding deep. Pushing this up sinks the boat deeper and makes
+    // it wetter and slower to right itself; down floats it high, as an empty
+    // hull does.
     submergedFraction: 0.35,
     probeColumns: 3,
     probeRows: 5,
@@ -323,6 +339,109 @@ myApp.ready().then(function () {
   myApp.run();
 });
 
+/**
+ * A small open boat inside the box `size`, bow towards local +Z: a pointed
+ * stem raked up out of the water, a flat transom at the stern, a V bottom
+ * breaking at a chine into the topsides, and a little sheer towards the bow.
+ * Flat shaded. Returns the hull and the deck as separate primitives, for two
+ * materials.
+ */
+function createBoatPrimitives(size) {
+  const halfBeam = size.sizeX / 2;
+  const height = size.sizeY;
+  const length = size.sizeZ;
+  const stations = 24;
+  const smooth = (t) => t * t * (3 - 2 * t);
+  // Station t from the transom (0) to the stem (1): its half beam, keel,
+  // chine and gunwale heights
+  const section = (t) => {
+    const plan =
+      t < 0.55 ? 0.82 + 0.18 * Math.sin((Math.PI / 2) * (t / 0.55)) : 1 - ((t - 0.55) / 0.45) ** 1.6;
+    const hb = halfBeam * plan;
+    const keel = -height / 2 + 0.55 * height * Math.max(0, (t - 0.6) / 0.4) ** 2;
+    const gunwale = height / 2 - 0.12 * height + 0.12 * height * smooth(t);
+    const chine = Math.min(keel + 0.22 * height, gunwale - 0.05);
+    const z = -length / 2 + t * length;
+    return {
+      z,
+      mid: (keel + gunwale) / 2,
+      // Port gunwale, port chine, keel, starboard chine, starboard gunwale
+      points: [
+        [-hb, gunwale],
+        [-0.88 * hb, chine],
+        [0, keel],
+        [0.88 * hb, chine],
+        [hb, gunwale]
+      ]
+    };
+  };
+  const sections = [];
+  for (let i = 0; i <= stations; i++) {
+    sections.push(section(i / stations));
+  }
+  // Triangles turned so their normal points away from `outward`'s reference
+  const build = () => ({ positions: [], normals: [], indices: [] });
+  const hull = build();
+  const deck = build();
+  const addTriangle = (target, a, b, c, outward) => {
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const len = Math.hypot(n[0], n[1], n[2]);
+    if (len < 1e-9) {
+      return;
+    }
+    n = n.map((x) => x / len);
+    const centroid = [0, 1, 2].map((k) => (a[k] + b[k] + c[k]) / 3);
+    const out = outward(centroid);
+    if (n[0] * out[0] + n[1] * out[1] + n[2] * out[2] < 0) {
+      [b, c] = [c, b];
+      n = n.map((x) => -x);
+    }
+    for (const p of [a, b, c]) {
+      target.indices.push(target.positions.length / 3);
+      target.positions.push(...p);
+      target.normals.push(...n);
+    }
+  };
+  // Away from the hull's axis at that height, in the cross-section's plane
+  const radial = (p) => {
+    const t = Math.min(1, Math.max(0, (p[2] + length / 2) / length));
+    return [p[0], p[1] - section(t).mid, 0];
+  };
+  for (let i = 0; i < stations; i++) {
+    const s0 = sections[i];
+    const s1 = sections[i + 1];
+    const at = (s, k) => [s.points[k][0], s.points[k][1], s.z];
+    for (let k = 0; k < 4; k++) {
+      addTriangle(hull, at(s0, k), at(s0, k + 1), at(s1, k + 1), radial);
+      addTriangle(hull, at(s0, k), at(s1, k + 1), at(s1, k), radial);
+    }
+    addTriangle(deck, at(s0, 0), at(s0, 4), at(s1, 4), () => [0, 1, 0]);
+    addTriangle(deck, at(s0, 0), at(s1, 4), at(s1, 0), () => [0, 1, 0]);
+  }
+  // The transom, a fan across the stern section
+  const stern = sections[0];
+  const sp = (k) => [stern.points[k][0], stern.points[k][1], stern.z];
+  for (let k = 1; k < 4; k++) {
+    addTriangle(hull, sp(0), sp(k), sp(k + 1), () => [0, 0, -1]);
+  }
+  const bounds = new BoundingBox(
+    new Vector3(-halfBeam, -height / 2, -length / 2),
+    new Vector3(halfBeam, height / 2, length / 2)
+  );
+  const toPrimitive = (data) => {
+    const prim = new Primitive();
+    prim.createAndSetVertexBuffer('position_f32x3', new Float32Array(data.positions));
+    prim.createAndSetVertexBuffer('normal_f32x3', new Float32Array(data.normals));
+    prim.createAndSetIndexBuffer(new Uint16Array(data.indices));
+    prim.setBoundingVolume(bounds);
+    prim.indexCount = data.indices.length;
+    return prim;
+  };
+  return { hull: toPrimitive(hull), deck: toPrimitive(deck) };
+}
+
 function buildScene() {
   const scene = new Scene();
 
@@ -366,8 +485,8 @@ function buildScene() {
   water.refractionScale = 1;
   water.subsurfaceIntensity = 0.5;
   water.subsurfaceCrestHeight = 1.5;
-  water.foamAmount = 0.3;
-  water.foamFalloff = 1.8;
+  //water.foamAmount = 0.3;
+  water.foamFalloff = 0.8;
 
   water.causticsEnabled = true;
   water.causticsDepth = 3;
@@ -397,14 +516,31 @@ function buildScene() {
     sun.shadow.shadowRegion.addStaticCaster(pole);
   }
 
-  // A boat: a box hull that floats on the water and is driven from the keyboard.
+  // A boat that floats on the water and is driven from the keyboard: a hull
+  // with a deck and a helm console on it
   const boatMaterial = new PBRMetallicRoughnessMaterial();
   boatMaterial.albedoColor = new Vector4(0.8, 0.3, 0.2, 1);
   boatMaterial.metallic = 0;
   boatMaterial.roughness = 0.6;
-  const boat = new Mesh(scene, new BoxShape(BOAT_SIZE), boatMaterial);
+  const deckMaterial = new PBRMetallicRoughnessMaterial();
+  deckMaterial.albedoColor = new Vector4(0.62, 0.48, 0.32, 1);
+  deckMaterial.metallic = 0;
+  deckMaterial.roughness = 0.8;
+  const consoleMaterial = new PBRMetallicRoughnessMaterial();
+  consoleMaterial.albedoColor = new Vector4(0.9, 0.9, 0.88, 1);
+  consoleMaterial.metallic = 0;
+  consoleMaterial.roughness = 0.4;
+  const boatPrimitives = createBoatPrimitives(BOAT_SIZE);
+  const boat = new Mesh(scene, boatPrimitives.hull, boatMaterial);
   boat.position.setXYZ(0, 0, -10);
-  sun.shadow.shadowRegion.addDynamicCaster(boat);
+  const boatDeck = new Mesh(scene, boatPrimitives.deck, deckMaterial);
+  boatDeck.parent = boat;
+  const helm = new Mesh(scene, new BoxShape({ sizeX: 0.8, sizeY: 0.4, sizeZ: 0.5 }), consoleMaterial);
+  helm.parent = boat;
+  helm.position.setXYZ(0, 0.55, -0.4);
+  for (const part of [boat, boatDeck, helm]) {
+    sun.shadow.shadowRegion.addDynamicCaster(part);
+  }
   sun.shadow.shadowDistance = 100;
 
   // A buoy that bobs in and out of the water on its own.

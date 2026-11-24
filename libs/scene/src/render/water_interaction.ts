@@ -49,6 +49,17 @@ const MAX_FRAME_DELTA = 0.25;
 const MAX_COURANT = 0.6;
 /** Window shift for steps after the first in a frame. @internal */
 const ZERO_SHIFT = new Vector2(0, 0);
+/**
+ * DISTURBER_SPAN: the disturbers are posed once a frame, the field stepped
+ * FIXED_STEP at a time, as many steps as the frame's time covers. Each step
+ * takes its share of the way from the poses at the last frame that stepped to
+ * the poses now, the ambient surface under them with them, rather than the
+ * first step taking all of it; and the foam reads that motion's speed over the
+ * time it took, not over the step it is put in at. Otherwise a frame of two
+ * steps, or one that has waited for a step, forces the water at twice the
+ * speed or more, and the foam, made by a power of that speed near its
+ * threshold, comes in bursts along a steady wake. @internal
+ */
 /** Texture formats tried in order for the field: height, previous height, foam. @internal */
 const HEIGHT_FORMATS: TextureFormat[] = ['rgba32f', 'rgba16f'];
 /** Most disturbers the field can carry at once. @internal */
@@ -424,6 +435,10 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
       this.impulses = pb.vec4[MAX_IMPULSES]().uniform(0);
       this.numDisturbers = pb.int().uniform(0);
       this.disturbers = pb.vec4[MAX_DISTURBERS * DISTURBER_VEC4S]().uniform(0);
+      // The disturbers' motion this step (see DISTURBER_SPAN): (share of the
+      // way from their last poses to their poses now it starts at, ends at,
+      // steps per second of the time that motion took, 0)
+      this.disturberSpan = pb.vec4().uniform(0);
       // Height of the ambient surface over the still water under each
       // disturber, at this step and at the last
       this.surfNow = pb.tex2D().uniform(0);
@@ -596,9 +611,12 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
         // Downward acceleration of the surface under the waves alone, before
         // anything is forced into it, for the breaking crests
         this.$l.sink = pb.mul(pb.neg(this.stepParams.x), this.lap, this.foamParams2.w, this.foamParams2.w);
+        // The surface's own rise this step, before anything is forced into it
+        this.$l.waveRise = pb.sub(this.next, this.cur);
         this.$l.centre = pb.add(this.fp, pb.vec2(0.5));
-        // Height forced into the surface this step by impulses and disturbers
+        // Height forced into the surface this step by impulses, and by disturbers
         this.$l.forced = pb.float(0);
+        this.$l.disturbed = pb.float(0);
         this.$for(pb.int('i'), 0, MAX_IMPULSES, function () {
           this.$if(pb.greaterThanEqual(this.i, this.numImpulses), function () {
             this.$break();
@@ -624,43 +642,58 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
             this.$break();
           });
           this.$l.k = pb.mul(this.j, DISTURBER_VEC4S);
-          this.$l.sNow = pb.textureLoad(this.surfNow, pb.ivec2(this.j, 0), 0).x;
-          this.$l.aBefore = this.disturbers.at(pb.add(this.k, 3));
-          this.$l.sBefore = this.$choice(
-            pb.greaterThan(this.aBefore.w, 0.5),
+          this.$l.a1 = this.disturbers.at(this.k);
+          this.$l.b1 = this.disturbers.at(pb.add(this.k, 1));
+          this.$l.c1 = this.disturbers.at(pb.add(this.k, 2));
+          this.$l.a0 = this.disturbers.at(pb.add(this.k, 3));
+          this.$l.b0 = this.disturbers.at(pb.add(this.k, 4));
+          this.$l.c0 = this.disturbers.at(pb.add(this.k, 5));
+          this.$l.s1 = pb.textureLoad(this.surfNow, pb.ivec2(this.j, 0), 0).x;
+          this.$l.s0 = this.$choice(
+            pb.greaterThan(this.a0.w, 0.5),
             pb.textureLoad(this.surfPrev, pb.ivec2(this.j, 0), 0).x,
-            this.sNow
+            this.s1
           );
+          // This step's share of the way from the last poses to now's (see
+          // DISTURBER_SPAN), the surface under the shape with them
+          this.$l.spanStart = this.disturberSpan.x;
+          this.$l.spanEnd = this.disturberSpan.y;
           this.$l.now = this.wiFootprint(
-            this.disturbers.at(this.k),
-            this.disturbers.at(pb.add(this.k, 1)),
-            this.disturbers.at(pb.add(this.k, 2)),
-            this.sNow,
+            pb.mix(this.a0, this.a1, this.spanEnd),
+            pb.mix(this.b0, this.b1, this.spanEnd),
+            pb.mix(this.c0, this.c1, this.spanEnd),
+            pb.mix(this.s0, this.s1, this.spanEnd),
             this.wp
           );
           this.$l.before = this.wiFootprint(
-            this.aBefore,
-            this.disturbers.at(pb.add(this.k, 4)),
-            this.disturbers.at(pb.add(this.k, 5)),
-            this.sBefore,
+            pb.mix(this.a0, this.a1, this.spanStart),
+            pb.mix(this.b0, this.b1, this.spanStart),
+            pb.mix(this.c0, this.c1, this.spanStart),
+            pb.mix(this.s0, this.s1, this.spanStart),
             this.wp
           );
           this.$l.change = pb.mul(pb.sub(this.now, this.before), this.absorb);
           this.next = pb.sub(this.next, this.change);
-          this.forced = pb.sub(this.forced, this.change);
+          this.disturbed = pb.sub(this.disturbed, this.change);
         });
         // Foam, as air trapped in the water (Ihmsen et al.): made in
         // proportion to the kinetic-energy potential of the surface's speed
         // times what traps the air, the water forced aside by a disturber or an
         // impulse, and crests breaking by Longuet-Higgins' limit, their
         // downward acceleration past a share of gravity.
-        this.$l.speed = pb.mul(pb.abs(pb.sub(this.next, this.cur)), this.foamParams2.w);
+        // Speeds per second of real time: a disturber's motion over the time it
+        // took (see DISTURBER_SPAN), not over the step it is put in at
+        this.$l.forcedRate = pb.add(
+          pb.mul(this.forced, this.foamParams2.w),
+          pb.mul(this.disturbed, this.disturberSpan.z)
+        );
+        this.$l.speed = pb.abs(pb.add(pb.mul(this.waveRise, this.foamParams2.w), this.forcedRate));
         this.$l.kinetic = this.wiPotential(
           pb.mul(this.speed, this.speed, 0.5),
           this.foamParams.z,
           this.foamParams.w
         );
-        this.$l.forcedSpeed = pb.mul(pb.abs(this.forced), this.foamParams2.w);
+        this.$l.forcedSpeed = pb.abs(this.forcedRate);
         this.$l.trapped = this.wiPotential(
           pb.mul(this.forcedSpeed, this.forcedSpeed, 0.5),
           this.foamParams.z,
@@ -881,6 +914,10 @@ export class WaterInteraction extends Disposable {
   private _originZ: number;
   private _hasOrigin: boolean;
   private _accumulator: number;
+  /** Seconds since the disturbers were last posed for a step, see DISTURBER_SPAN. */
+  private _poseAge: number;
+  /** See DISTURBER_SPAN: (share of the way the step starts at, ends at, steps per second of real time, 0). */
+  private readonly _disturberSpan: Vector4;
   private _lastTime: number;
   private _version: number;
   private _program: Nullable<GPUProgram>;
@@ -952,6 +989,8 @@ export class WaterInteraction extends Disposable {
     this._originZ = 0;
     this._hasOrigin = false;
     this._accumulator = 0;
+    this._poseAge = 0;
+    this._disturberSpan = new Vector4();
     this._lastTime = -1;
     this._version = 0;
     this._program = null;
@@ -1336,7 +1375,8 @@ export class WaterInteraction extends Disposable {
    *
    * Runs as many fixed steps as the elapsed time covers, up to a cap; the
    * window is moved and queued impulses are injected on the first step of a
-   * frame. Nothing is done for a frame too short to reach a step.
+   * frame, and each step takes its share of the disturbers' motion (see
+   * DISTURBER_SPAN). Nothing is done for a frame too short to reach a step.
    * @internal
    */
   update(time: number) {
@@ -1347,6 +1387,7 @@ export class WaterInteraction extends Disposable {
     const dt = this._lastTime < 0 ? 0 : Math.min(MAX_FRAME_DELTA, Math.max(0, time - this._lastTime));
     this._lastTime = time;
     this._accumulator += dt;
+    this._poseAge += dt;
     let steps = Math.floor(this._accumulator / FIXED_STEP);
     if (steps > MAX_SUBSTEPS) {
       steps = MAX_SUBSTEPS;
@@ -1442,13 +1483,15 @@ export class WaterInteraction extends Disposable {
         bindGroup.setValue('shift', this._shift);
         bindGroup.setValue('numImpulses', numImpulses);
         bindGroup.setValue('impulses', this._impulseData);
-        bindGroup.setValue('numDisturbers', numDisturbers);
         bindGroup.setValue('disturbers', this._disturberData);
       } else {
         bindGroup.setValue('shift', ZERO_SHIFT);
         bindGroup.setValue('numImpulses', 0);
-        bindGroup.setValue('numDisturbers', 0);
       }
+      // This step's share of the disturbers' motion since they were last posed
+      this._disturberSpan.setXYZW(i / steps, (i + 1) / steps, steps / Math.max(this._poseAge, 1e-3), 0);
+      bindGroup.setValue('numDisturbers', numDisturbers);
+      bindGroup.setValue('disturberSpan', this._disturberSpan);
       device.setFramebuffer(dst);
       device.setProgram(program);
       device.setBindGroup(0, bindGroup);
@@ -1468,6 +1511,7 @@ export class WaterInteraction extends Disposable {
         d._hasPrev = true;
       }
     }
+    this._poseAge = 0;
     this._version++;
   }
   /**
@@ -1781,6 +1825,7 @@ export class WaterInteraction extends Disposable {
     this._hasOrigin = false;
     this._current = 0;
     this._accumulator = 0;
+    this._poseAge = 0;
   }
   /**
    * Create the ping-pong pair and the obstacle mask if they are missing,
@@ -2017,29 +2062,29 @@ export class InteractiveWaveGenerator extends Disposable implements WaveGenerato
     scope: PBInsideFunctionScope,
     xz: PBShaderExp,
     vertexNormal: PBShaderExp,
-    foamSample?: PBShaderExp,
+    foamFlow?: PBShaderExp,
     footprint?: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    // The foam sample and footprint, when there are, are passed on to the wrapped generator
+    // The foam flow and footprint, when there are, are passed on to the wrapped generator
     const params = [pb.vec2('xz'), pb.vec3('vn')];
     const args = [xz, vertexNormal];
-    if (foamSample) {
-      params.push(pb.vec3('fs').inout());
-      args.push(foamSample);
+    if (foamFlow) {
+      params.push(pb.vec2('fflow').inout());
+      args.push(foamFlow);
     }
     if (footprint) {
       params.push(pb.vec4('fp'));
       args.push(footprint);
     }
-    const funcName = `wiCalcNormalAndFoam${foamSample ? 'S' : ''}${footprint ? 'F' : ''}`;
+    const funcName = `wiCalcNormalAndFoam${foamFlow ? 'S' : ''}${footprint ? 'F' : ''}`;
     pb.func(funcName, params, function () {
       this.$l.nf = that._base.calcFragmentNormalAndFoam(
         this,
         this.xz,
         this.vn,
-        foamSample ? this.fs : undefined,
+        foamFlow ? this.fflow : undefined,
         footprint ? this.fp : undefined
       );
       this.$l.n = pb.normalize(this.nf.xyz);

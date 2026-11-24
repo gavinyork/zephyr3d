@@ -1313,7 +1313,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     scope: PBInsideFunctionScope,
     xz: PBShaderExp,
     _vertexNormal?: PBShaderExp,
-    _foamSample?: PBShaderExp,
+    _foamFlow?: PBShaderExp,
     xzGrad?: PBShaderExp
   ) {
     const pb = scope.$builder;
