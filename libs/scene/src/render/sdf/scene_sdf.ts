@@ -109,7 +109,7 @@ export interface SceneSDFStats {
 type SceneSDFEvents = {
   /**
    * The field changed inside a world box: an instance became ready, went away,
-   * or a static one moved. A global field rebuilds the region.
+   * or a static one moved, or the terrain changed. A global field rebuilds the region.
    */
   dirty: [min: Vector3, max: Vector3];
 };
@@ -151,6 +151,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   private _atlasFull: number;
   private _updates: number;
   private readonly _camera: Vector3;
+  /** Bumped whenever an instance starts or stops being held by the clipmap, see {@link SceneSDF.holdsStatic}. */
+  private _layoutVersion: number;
   constructor(scene: Scene) {
     super();
     this._scene = scene;
@@ -171,6 +173,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     this._atlasSize = [512, 256, 256];
     this._updates = 0;
     this._camera = new Vector3();
+    this._layoutVersion = 0;
     this.streamRadius = 256;
     this.maxConcurrentLoads = 4;
     this.uploadBudget = 4 * 1024 * 1024;
@@ -254,6 +257,22 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   /** Instances taking part, static and dynamic. */
   get instances(): IterableIterator<SDFInstance> {
     return this._instances.values();
+  }
+  /**
+   * True when the clipmap of {@link SceneSDF.global} holds the node's geometry, so rays traced
+   * through it see the node: a static instance whose field is ready, or the terrain.
+   * @internal
+   */
+  holdsStatic(node: SceneNode) {
+    if (node.isMesh()) {
+      const inst = this._instances.get(node);
+      return !!inst && inst.mode === 'static' && this.isReady(inst);
+    }
+    return node.isClipmapTerrain() && node === this._terrain;
+  }
+  /** Changes whenever {@link SceneSDF.holdsStatic} may answer differently for some mesh. @internal */
+  get layoutVersion() {
+    return this._layoutVersion;
   }
   /** True when the instance's field is in the atlas and on the GPU. */
   isReady(instance: SDFInstance) {
@@ -656,6 +675,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   /** @internal */
   private emitBounds(box: AABB) {
     if (box.minPoint.x <= box.maxPoint.x) {
+      this._layoutVersion++;
       this._global?.markDirty(box.minPoint, box.maxPoint);
       this.dispatchEvent('dirty', box.minPoint, box.maxPoint);
     }

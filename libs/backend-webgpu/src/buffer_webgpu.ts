@@ -110,43 +110,50 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       throw new Error('no enough space for querying buffer data');
     }
     let readOffsetInBytes = offsetInBytes;
-    if (!(this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_PACK_PIXEL))) {
-      if (this._gpuUsage & GPUBufferUsage.COPY_SRC) {
-        const copyOffsetInBytes = offsetInBytes & ~3;
-        readOffsetInBytes = offsetInBytes - copyOffsetInBytes;
-        const copySizeInBytes = (readOffsetInBytes + sizeInBytes + 3) & ~3;
-        sourceBuffer = this._device.createBuffer(copySizeInBytes, { usage: 'read' });
-        this._device.copyBuffer(this, sourceBuffer, copyOffsetInBytes, 0, copySizeInBytes);
-        // Let the copy ride the next submit rather than flushing here: a flush in the
-        // middle of a frame splits it in two and leaves the GPU idle until the rest
-        // of the frame is submitted.
+    // The staging buffer is released whatever fails: the submit wait, the map, or the copy out
+    try {
+      if (!(this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_PACK_PIXEL))) {
+        if (this._gpuUsage & GPUBufferUsage.COPY_SRC) {
+          const copyOffsetInBytes = offsetInBytes & ~3;
+          readOffsetInBytes = offsetInBytes - copyOffsetInBytes;
+          const copySizeInBytes = (readOffsetInBytes + sizeInBytes + 3) & ~3;
+          sourceBuffer = this._device.createBuffer(copySizeInBytes, { usage: 'read' });
+          this._device.copyBuffer(this, sourceBuffer, copyOffsetInBytes, 0, copySizeInBytes);
+          // Let the copy ride the next submit rather than flushing here: a flush in the
+          // middle of a frame splits it in two and leaves the GPU idle until the rest
+          // of the frame is submitted.
+          this._device.scheduleAutoFlush();
+          await this._device.commandQueue.onNextSubmit();
+        } else {
+          throw new Error(
+            'getBufferSubData() failed: buffer does not have BF_READ or BF_PACK_PIXEL flag set'
+          );
+        }
+      } else {
+        this.sync();
+        // The staging buffer is filled by a copy encoded into the current command stream
+        // (e.g. a texture readback) which has not been submitted yet. Ensure that submit
+        // happens before mapping, otherwise mapAsync could resolve against stale contents.
+        // Inside a render frame the copy rides the normal end-of-frame submit; for standalone
+        // readbacks (outside any frame) scheduleAutoFlush guarantees a submit still occurs.
         this._device.scheduleAutoFlush();
         await this._device.commandQueue.onNextSubmit();
-      } else {
-        throw new Error('getBufferSubData() failed: buffer does not have BF_READ or BF_PACK_PIXEL flag set');
       }
-    } else {
-      this.sync();
-      // The staging buffer is filled by a copy encoded into the current command stream
-      // (e.g. a texture readback) which has not been submitted yet. Ensure that submit
-      // happens before mapping, otherwise mapAsync could resolve against stale contents.
-      // Inside a render frame the copy rides the normal end-of-frame submit; for standalone
-      // readbacks (outside any frame) scheduleAutoFlush guarantees a submit still occurs.
-      this._device.scheduleAutoFlush();
-      await this._device.commandQueue.onNextSubmit();
+      const buffer = sourceBuffer.object as GPUBuffer;
+      await buffer.mapAsync(GPUMapMode.READ);
+      try {
+        const range = buffer.getMappedRange();
+        dstBuffer = dstBuffer || new Uint8Array(sizeInBytes);
+        dstBuffer.set(new Uint8Array(range, readOffsetInBytes, sizeInBytes));
+      } finally {
+        buffer.unmap();
+      }
+      return dstBuffer;
+    } finally {
+      if (sourceBuffer !== this) {
+        sourceBuffer.dispose();
+      }
     }
-    const buffer = sourceBuffer.object as GPUBuffer;
-    await buffer.mapAsync(GPUMapMode.READ);
-    const range = buffer.getMappedRange();
-    dstBuffer = dstBuffer || new Uint8Array(sizeInBytes);
-    dstBuffer.set(new Uint8Array(range, readOffsetInBytes, sizeInBytes));
-    buffer.unmap();
-
-    if (sourceBuffer !== this) {
-      sourceBuffer.dispose();
-    }
-
-    return dstBuffer;
   }
   restore() {
     if (!this._device.isContextLost()) {

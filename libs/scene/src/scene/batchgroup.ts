@@ -170,6 +170,10 @@ export class BatchGroup extends GraphNode {
   invalidate() {
     this._changeTag++;
   }
+  /** Bumped whenever the group's contents change, see {@link BatchGroup.invalidate}. @internal */
+  get changeTag() {
+    return this._changeTag;
+  }
   /** @internal */
   protected _onDetached() {
     super._onDetached();

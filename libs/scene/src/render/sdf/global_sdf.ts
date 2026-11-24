@@ -300,6 +300,34 @@ export class GlobalSDF {
   get dynamicCount() {
     return this._dynamicInfo.x;
   }
+  /** True once every level is placed and has nothing left to composite: the clipmap holds the scene. */
+  get settled() {
+    for (let level = 0; level < this.levels; level++) {
+      if (!this._origins[level] || this._dirty[level].size > 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+  /**
+   * The world box of the coarsest level's window, outside which the field knows no geometry.
+   * @returns False before the level is placed.
+   */
+  getCoverage(outMin: Vector3, outMax: Vector3) {
+    const level = this.levels - 1;
+    const origin = this._origins[level];
+    if (!origin) {
+      return false;
+    }
+    const vs = this.voxelSize(level);
+    outMin.setXYZ(origin[0] * vs, origin[1] * vs, origin[2] * vs);
+    outMax.setXYZ(
+      (origin[0] + this.resolution) * vs,
+      (origin[1] + this.resolution) * vs,
+      (origin[2] + this.resolution) * vs
+    );
+    return true;
+  }
   /**
    * The materials composited alongside the distances, or null for distances
    * alone. Changing it rebuilds the whole field.
@@ -405,6 +433,7 @@ export class GlobalSDF {
         const box = t?.getWorldBoundingVolume()?.toAABB();
         if (box) {
           this.markDirty(box.minPoint, box.maxPoint);
+          this._sdf.dispatchEvent('dirty', box.minPoint, box.maxPoint);
         }
       }
     }

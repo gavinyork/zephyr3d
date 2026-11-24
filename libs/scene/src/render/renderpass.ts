@@ -1,6 +1,7 @@
 import type { Immutable, Nullable } from '@zephyr3d/base';
 import { DEBUG_VIEWS, DEPTH_CLEAR_VALUE, Disposable, Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
+import type { CullDrawnCallback } from './cull_visitor';
 import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
@@ -99,6 +100,10 @@ export abstract class RenderPass extends Disposable {
   }
   /** @internal */
   protected abstract _getGlobalBindGroupHash(ctx: DrawContext, camera: Camera): string;
+  /** Told of what {@link RenderPass.cullScene} draws; none by default. @internal */
+  protected getCullDrawnCallback(_ctx: DrawContext): Nullable<CullDrawnCallback> {
+    return null;
+  }
   /** @internal */
   protected abstract renderItems(ctx: DrawContext, renderCamera: Camera, renderQueue: RenderQueue): void;
   /** @internal */
@@ -129,6 +134,7 @@ export abstract class RenderPass extends Disposable {
     const renderQueue = new RenderQueue(this);
     // Levels of detail follow the view being rendered, shadow cascades included
     const cullVisitor = new CullVisitor(this, cullCamera, renderQueue, ctx.camera);
+    cullVisitor.onDrawn = this.getCullDrawnCallback(ctx);
     if (ctx.scene.octree) {
       ctx.scene.octree.getRootNode().traverse(cullVisitor);
     } else {

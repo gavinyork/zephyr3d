@@ -54,6 +54,14 @@ export class LightPass extends RenderPass {
     this._renderSky = true;
     this._clearColor = Vector4.zero();
   }
+  /**
+   * Surfaces drawn by the light pass read the GI probes, which keep the ones around what the
+   * scene field cannot show their rays up to date.
+   * @internal
+   */
+  protected getCullDrawnCallback(ctx: DrawContext) {
+    return getActiveProbeVolume(ctx.scene)?.drawnCallback ?? null;
+  }
   /** @internal */
   get transmission() {
     return this._transmission;

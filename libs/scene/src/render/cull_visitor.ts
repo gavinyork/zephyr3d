@@ -1,4 +1,4 @@
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, Nullable } from '@zephyr3d/base';
 import { ClipState } from '@zephyr3d/base';
 import { OctreeNode } from '../scene/octree';
 import { RENDER_PASS_TYPE_OBJECT_COLOR, RENDER_PASS_TYPE_SHADOWMAP } from '../values';
@@ -17,6 +17,13 @@ import type { Water } from '../scene/water';
 import type { HairNode } from '../scene/hair';
 import { getDevice } from '../app/api';
 import { warnUnsupported } from '../utility/unsupported';
+
+/**
+ * Told of what a cull draws: each drawable pushed, with its node, and each batch group taken
+ * whole, with no drawable.
+ * @internal
+ */
+export type CullDrawnCallback = (node: SceneNode, drawable: Nullable<Drawable>) => void;
 
 /**
  * Node visitor for culling
@@ -38,6 +45,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   private readonly _isShadowMapping: boolean;
   /** @internal */
   private _lodCamera: Camera;
+  /** @internal */
+  private _onDrawn: Nullable<CullDrawnCallback>;
   /**
    * Creates an instance of CullVisitor
    * @param renderPass - Render pass for the culling task
@@ -54,6 +63,14 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     this._renderPass = renderPass;
     this._isGPUPicking = this._renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR;
     this._isShadowMapping = this._renderPass.type === RENDER_PASS_TYPE_SHADOWMAP;
+    this._onDrawn = null;
+  }
+  /** Told of everything the cull draws, see {@link RenderPass.cullScene}. @internal */
+  get onDrawn() {
+    return this._onDrawn;
+  }
+  set onDrawn(callback: Nullable<CullDrawnCallback>) {
+    this._onDrawn = callback;
   }
   /** The camera that will be used for culling */
   get camera() {
@@ -107,6 +124,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   /** @internal */
   push(camera: Camera, drawable: Drawable, lod = 0) {
     this.renderQueue.push(camera, drawable, lod);
+    this._onDrawn?.(drawable.getNode(), drawable);
   }
   /** @internal */
   pushRenderQueue(renderQueue: RenderQueue) {
@@ -176,6 +194,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     if (!node.hidden) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
+        // Its cached meshes are pushed once, when the cached queue is built, not every frame
+        this._onDrawn?.(node, null);
         node.cull(this);
         return true;
       }

@@ -8,12 +8,15 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import type { Nullable, Vector3 } from '@zephyr3d/base';
-import { half2float, PRNG, Vector4 } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
+import { half2float, PRNG, Vector3, Vector4 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import type { Scene } from '../../scene/scene';
 import type { Camera } from '../../camera/camera';
-import type { DrawContext } from '../drawable';
+import type { Drawable, DrawContext } from '../drawable';
+import type { SceneNode } from '../../scene/scene_node';
+import type { BatchGroup } from '../../scene/batchgroup';
+import type { CullDrawnCallback } from '../cull_visitor';
 import type { SceneSDF } from '../sdf/scene_sdf';
 import type { VoxelScene } from './voxel_scene';
 import { buildSDFProgram } from '../sdf/sdf_programs';
@@ -26,6 +29,7 @@ import {
   declareDynamicSDFUniforms,
   declareGlobalSDFUniforms,
   GLOBAL_SDF_LEVELS,
+  GLOBAL_SDF_PARAMS,
   sampleGlobalSDF,
   sampleGlobalSDFLevel,
   sampleSceneSDF,
@@ -78,6 +82,19 @@ const TRACE_STEPS = 48;
 const VISIBILITY_RANGE = 2.6;
 /** Frames between relocations of an updated probe. */
 const RELOCATE_EVERY = 8;
+/**
+ * Frames between updates of a probe no surface reads. Such a probe only looks out for something
+ * coming within its reach that neither the scene field nor a draw reported.
+ */
+const IDLE_PROBE_PERIOD = 240;
+/** Frames between readbacks of the probes' nearest geometry, see {@link ProbeVolume.classify}. */
+const CLASSIFY_EVERY = 30;
+/** Frames a probe stays read after a drawn object marked it, so frames drawn without an update lose none. */
+const DRAWN_FRAMES = 3;
+/** Nearest geometry, in probe spacings, of a probe with none known within reach. */
+const PROBE_FAR = 1e6;
+/** No update classifies the probe until the scene field has settled, see {@link ProbeVolume.settle}. */
+const UNSETTLED = 0x7fffffff;
 /** Bits of a selection entry: tile index, level, first-update flag. */
 const SELECT_INDEX_MASK = 0x00ffffff;
 const SELECT_LEVEL_SHIFT = 24;
@@ -129,6 +146,11 @@ export interface ProbeVolumeStats {
   uninitialized: number;
   /** Probes updated by the last frame. */
   lastUpdated: number;
+  /**
+   * Probes some surface may read: near geometry, by a drawn object the scene field does not
+   * hold, or not classified yet. The others are updated only every few seconds.
+   */
+  wanted: number;
   updates: number;
   /** Per level: probes per axis, spacing and the world index of the window's first probe. */
   levelInfo: { grid: [number, number, number]; spacing: number; origin: [number, number, number] }[];
@@ -147,6 +169,25 @@ interface ProbeLevel {
   /** Frame a probe was last selected in, so no frame updates one twice. */
   lastSelected: Int32Array;
   cursor: number;
+  /** Whether geometry lay within a probe's reach at its last classification; 1 until classified. */
+  near: Uint8Array;
+  /** Frame from which an update classifies a probe, {@link UNSETTLED} until the scene field settles. */
+  classifyAfter: Int32Array;
+  /** Frame a drawn object the scene field does not hold last came within a probe's reach. */
+  drawn: Int32Array;
+  /** Probes some surface may read, this frame; see {@link ProbeVolume.computeWanted}. */
+  wanted: Uint8Array;
+  wantedCount: number;
+  /** Cursor of the probes no surface reads. */
+  idleCursor: number;
+}
+
+/** Per-axis tables of a level's window, see {@link ProbeVolume.computeWanted}. */
+interface ProbeAxis {
+  /** Slot of the k-th probe of the window. */
+  slot: Int32Array;
+  /** Within the full-weight region of the finer level, a cell to spare. */
+  inner: Uint8Array;
 }
 
 /**
@@ -220,6 +261,27 @@ export class ProbeVolume {
   private _exposureScale: number;
   private readonly _rotation: Vector4;
   private readonly _prng: PRNG;
+  /**
+   * Per probe, in its level's spacings: the nearest hit of its last update's rays, and its
+   * distance to the static scene field at its last relocation. {@link PROBE_FAR} for none.
+   */
+  private _hits: Nullable<GPUDataBuffer>;
+  private readonly _hitsRead: Float32Array<ArrayBuffer>;
+  private _hitsPending: boolean;
+  private _hitsFrame: number;
+  private _hitsFailed: boolean;
+  /** Some probes wait for the scene field to settle before an update may classify them. */
+  private _awaitSettle: boolean;
+  private _listenedSDF: Nullable<SceneSDF>;
+  /** Whether a batch group holds meshes the scene field does not, by its contents and the field's. */
+  private readonly _groupMarks: WeakMap<BatchGroup, { tag: number; version: number; marks: boolean }>;
+  private readonly _scanned: Int32Array;
+  private readonly _idleScanned: Int32Array;
+  private readonly _axes: ProbeAxis[];
+  /** The scene field's window this frame, beyond which the probes' rays see nothing it holds. */
+  private _hasField: boolean;
+  private readonly _fieldMin: Vector3;
+  private readonly _fieldMax: Vector3;
   private _relocateProgram: Nullable<GPUProgram>;
   private _relocateBindGroup: Nullable<BindGroup>;
   private _seedProgram: Nullable<GPUProgram>;
@@ -235,6 +297,12 @@ export class ProbeVolume {
   private _commitBindGroup: Nullable<BindGroup>;
   private _renderStates: Nullable<RenderStateSet>;
   private readonly _scratch: Map<string, GPUDataBuffer>;
+  /**
+   * Given to the culls of the light pass: marks the probes around each lit object drawn that the
+   * scene field does not hold, which the probes' rays and classification cannot see.
+   * @internal
+   */
+  readonly drawnCallback: CullDrawnCallback;
   constructor(scene: Scene, options: ProbeVolumeOptions) {
     this._scene = scene;
     this._options = options;
@@ -254,7 +322,13 @@ export class ProbeVolume {
         state: new Uint8Array(count),
         lastRelocated: new Int32Array(count).fill(-1000),
         lastSelected: new Int32Array(count).fill(-1),
-        cursor: 0
+        cursor: 0,
+        near: new Uint8Array(count).fill(1),
+        classifyAfter: new Int32Array(count).fill(UNSETTLED),
+        drawn: new Int32Array(count).fill(-UNSETTLED),
+        wanted: new Uint8Array(count),
+        wantedCount: 0,
+        idleCursor: 0
       });
       tileBase += count;
     }
@@ -283,6 +357,24 @@ export class ProbeVolume {
     this._exposureScale = 1;
     this._rotation = new Vector4(0, 0, 0, 1);
     this._prng = new PRNG(1234);
+    this._hits = null;
+    this._hitsRead = new Float32Array(new ArrayBuffer(this._count * 8));
+    this._hitsPending = false;
+    this._hitsFrame = -CLASSIFY_EVERY;
+    this._hitsFailed = false;
+    this._awaitSettle = true;
+    this._listenedSDF = null;
+    this._groupMarks = new WeakMap();
+    this._scanned = new Int32Array(levels);
+    this._idleScanned = new Int32Array(levels);
+    const axisLength = Math.max(...grid);
+    this._axes = [0, 1, 2].map(() => ({
+      slot: new Int32Array(axisLength),
+      inner: new Uint8Array(axisLength)
+    }));
+    this._hasField = false;
+    this._fieldMin = new Vector3();
+    this._fieldMax = new Vector3();
     this._relocateProgram = null;
     this._relocateBindGroup = null;
     this._seedProgram = null;
@@ -298,6 +390,7 @@ export class ProbeVolume {
     this._commitBindGroup = null;
     this._renderStates = null;
     this._scratch = new Map();
+    this.drawnCallback = (node, drawable) => this.markDrawn(node, drawable);
   }
   /** Clipmap levels. */
   get levels() {
@@ -317,16 +410,19 @@ export class ProbeVolume {
   }
   getStats(): ProbeVolumeStats {
     let uninitialized = 0;
+    let wanted = 0;
     for (const level of this._levels) {
       for (let i = 0; i < level.count; i++) {
         uninitialized += level.state[i] ? 0 : 1;
       }
+      wanted += level.wantedCount;
     }
     return {
       levels: this._levels.length,
       probes: this._count,
       uninitialized,
       lastUpdated: this._lastUpdated,
+      wanted,
       updates: this._updates,
       levelInfo: this._levels.map((level) => ({
         grid: [...level.grid] as [number, number, number],
@@ -368,12 +464,20 @@ export class ProbeVolume {
       return;
     }
     this.ensureResources();
+    if (this._listenedSDF !== sdf) {
+      this._listenedSDF?.off('dirty', this.onFieldDirty, this);
+      sdf.on('dirty', this.onFieldDirty, this);
+      this._listenedSDF = sdf;
+    }
     const cameraPos = camera.getWorldPosition();
     for (const level of this._levels) {
       this.moveWindow(level, cameraPos);
     }
     this._frame++;
-    const selected = this.select();
+    if (this._awaitSettle && global.settled) {
+      this.settle();
+    }
+    const selected = this.select(global);
     this.updateParams();
     if (selected === 0) {
       return;
@@ -390,6 +494,8 @@ export class ProbeVolume {
     RenderGraphExecutor.profileScope('ProbeCommit', () => this.runCommit(selected));
     this._updates++;
     this._lastUpdated = selected;
+    // After this frame's updates, which the copy follows
+    this.readHits();
   }
   /**
    * Saves the volume: its maps, probe data and windows, to restore with
@@ -453,7 +559,6 @@ export class ProbeVolume {
     const lo = [Math.ceil(min.x / s), Math.ceil(min.y / s), Math.ceil(min.z / s)];
     const hi = [Math.floor(max.x / s), Math.floor(max.y / s), Math.floor(max.z / s)];
     const centre = [(min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2];
-    const wrap = (v: number, m: number) => ((v % m) + m) % m;
     const picked: { world: number[]; index: number }[] = [];
     for (let z = lo[2]; z <= hi[2]; z++) {
       for (let y = lo[1]; y <= hi[1]; y++) {
@@ -463,7 +568,8 @@ export class ProbeVolume {
             continue;
           }
           const local =
-            wrap(x, l.grid[0]) + l.grid[0] * (wrap(y, l.grid[1]) + l.grid[1] * wrap(z, l.grid[2]));
+            wrapIndex(x, l.grid[0]) +
+            l.grid[0] * (wrapIndex(y, l.grid[1]) + l.grid[1] * wrapIndex(z, l.grid[2]));
           picked.push({ world: w, index: local });
         }
       }
@@ -582,6 +688,7 @@ export class ProbeVolume {
         level.state[i] = data[(level.tileBase + i) * 4 + 3] > 0.5 ? 1 : 0;
       }
     });
+    this.resetClassification();
     this.updateParams();
     this._updates = Math.max(this._updates, 1);
   }
@@ -607,7 +714,11 @@ export class ProbeVolume {
     this._rayFramebuffer = null;
     this._data?.dispose();
     this._selected?.dispose();
-    this._data = this._selected = null;
+    this._hits?.dispose();
+    this._data = this._selected = this._hits = null;
+    this._hitsPending = false;
+    this._listenedSDF?.off('dirty', this.onFieldDirty, this);
+    this._listenedSDF = null;
     for (const buffer of this._scratch.values()) {
       buffer.dispose();
     }
@@ -687,9 +798,12 @@ export class ProbeVolume {
     this._data = device.createBuffer(this._count * 16, { usage: 'uniform', storage: true })!;
     this._data.bufferSubData(0, new Float32Array(new ArrayBuffer(this._count * 16)));
     this._selected = device.createBuffer(this._budget * 4, { usage: 'uniform', storage: true })!;
+    this._hits = device.createBuffer(this._count * 8, { usage: 'uniform', storage: true })!;
+    this._hitsPending = false;
     for (const level of this._levels) {
       level.state.fill(0);
     }
+    this.resetClassification();
   }
   /** Re-centres a level's window on the camera, a spacing at a time; probes that entered start over. @internal */
   private moveWindow(level: ProbeLevel, cameraPos: Vector3) {
@@ -705,7 +819,8 @@ export class ProbeVolume {
       return;
     }
     level.origin = next;
-    const wrap = (v: number, m: number) => ((v % m) + m) % m;
+    // The probes entering are classified once the field there is known
+    this._awaitSettle = true;
     for (let z = 0; z < n[2]; z++) {
       for (let y = 0; y < n[1]; y++) {
         for (let x = 0; x < n[0]; x++) {
@@ -721,9 +836,12 @@ export class ProbeVolume {
             wy < prev[1] + n[1] &&
             wz < prev[2] + n[2];
           if (!inPrev) {
-            const index = wrap(wx, n[0]) + n[0] * (wrap(wy, n[1]) + n[1] * wrap(wz, n[2]));
+            const index = wrapIndex(wx, n[0]) + n[0] * (wrapIndex(wy, n[1]) + n[1] * wrapIndex(wz, n[2]));
             level.state[index] = 0;
             level.lastRelocated[index] = -1000;
+            level.near[index] = 1;
+            level.classifyAfter[index] = UNSETTLED;
+            level.drawn[index] = -UNSETTLED;
             this._data!.bufferSubData((level.tileBase + index) * 16, this._dataReset);
           }
         }
@@ -731,13 +849,15 @@ export class ProbeVolume {
     }
   }
   /**
-   * Picks the probes to update: never-updated ones first (a quarter of the
-   * budget to the coarsest level, the rest finest first), then each level by
-   * its share. At most once per frame per probe, since two updates would race
-   * on the same staged tile.
+   * Picks the probes to update: never-updated ones first (a quarter of the budget to the
+   * coarsest level, the rest finest first); then a trickle of the probes no surface reads, each
+   * about once per {@link IDLE_PROBE_PERIOD} frames; then the probes surfaces may read, each level
+   * by its share of them and what is left finest first; then, with budget to spare, more of the
+   * probes no surface reads. At most once per frame per probe, since two updates would race on
+   * the same staged tile.
    * @internal
    */
-  private select() {
+  private select(global: NonNullable<SceneSDF['global']>) {
     let count = 0;
     const budget = this._budget;
     const frame = this._frame;
@@ -758,26 +878,322 @@ export class ProbeVolume {
     for (let l = 0; l < this._levels.length && count < budget; l++) {
       takeNew(l, budget);
     }
-    const remaining = budget - count;
-    for (let l = 0; l < this._levels.length && count < budget; l++) {
+    const wantedTotal = this.computeWanted(global);
+    this._scanned.fill(0);
+    this._idleScanned.fill(0);
+    // Probes no surface reads, along their own cursor, scanning at most `scans` of them
+    const takeIdle = (l: number, scans: number) => {
       const level = this._levels[l];
-      let share = Math.max(1, Math.round((remaining * level.count) / this._count));
-      let scanned = 0;
-      while (share > 0 && count < budget && scanned < level.count) {
-        const i = level.cursor;
-        level.cursor = (level.cursor + 1) % level.count;
-        scanned++;
-        if (level.state[i] && level.lastSelected[i] !== frame) {
+      for (let n = 0; n < scans && count < budget && this._idleScanned[l] < level.count; n++) {
+        const i = level.idleCursor;
+        level.idleCursor = (i + 1) % level.count;
+        this._idleScanned[l]++;
+        if (level.state[i] && !level.wanted[i] && level.lastSelected[i] !== frame) {
           this._selection[count++] = ((level.tileBase + i) | (l << SELECT_LEVEL_SHIFT)) >>> 0;
           level.lastSelected[i] = frame;
-          share--;
         }
       }
+    };
+    // Probes some surface may read, at most `limit` of them
+    const takeWanted = (l: number, limit: number) => {
+      const level = this._levels[l];
+      let taken = 0;
+      while (taken < limit && count < budget && this._scanned[l] < level.count) {
+        const i = level.cursor;
+        level.cursor = (i + 1) % level.count;
+        this._scanned[l]++;
+        if (level.state[i] && level.wanted[i] && level.lastSelected[i] !== frame) {
+          this._selection[count++] = ((level.tileBase + i) | (l << SELECT_LEVEL_SHIFT)) >>> 0;
+          level.lastSelected[i] = frame;
+          taken++;
+        }
+      }
+    };
+    for (let l = 0; l < this._levels.length; l++) {
+      takeIdle(l, Math.ceil(this._levels[l].count / IDLE_PROBE_PERIOD));
+    }
+    if (wantedTotal > 0) {
+      const remaining = budget - count;
+      for (let l = 0; l < this._levels.length; l++) {
+        takeWanted(l, Math.ceil((remaining * this._levels[l].wantedCount) / wantedTotal));
+      }
+      for (let l = 0; l < this._levels.length; l++) {
+        takeWanted(l, budget);
+      }
+    }
+    for (let l = 0; l < this._levels.length; l++) {
+      takeIdle(l, this._levels[l].count);
     }
     for (let i = count; i < budget; i++) {
       this._selection[i] = 0xffffffff;
     }
     return count;
+  }
+  /**
+   * Reach of a probe in its level's spacings: a surface reads the eight probes around the point
+   * it samples, which the normal and view biases displace from the surface.
+   * @internal
+   */
+  private reach() {
+    return Math.sqrt(3) + this._options.normalBias + this._options.viewBias;
+  }
+  /**
+   * Finds the probes some surface may read this frame: any not covered by the finer level's
+   * full-weight region that has geometry within reach by its classification, is not classified
+   * yet, or had a drawn object the probes' rays cannot see come within reach.
+   * @returns How many, all levels together.
+   * @internal
+   */
+  private computeWanted(global: NonNullable<SceneSDF['global']>) {
+    const drawnFrom = this._frame - DRAWN_FRAMES;
+    // For the draws of this frame, see markDrawn
+    this._hasField = global.getCoverage(this._fieldMin, this._fieldMax);
+    let total = 0;
+    for (let l = 0; l < this._levels.length; l++) {
+      const level = this._levels[l];
+      const origin = level.origin!;
+      const n = level.grid;
+      const s = level.spacing;
+      const finer = l > 0 ? this._levels[l - 1] : null;
+      for (let a = 0; a < 3; a++) {
+        const axis = this._axes[a];
+        for (let k = 0; k < n[a]; k++) {
+          const w = origin[a] + k;
+          const p = w * s;
+          axis.slot[k] = wrapIndex(w, n[a]);
+          // A finer level is fully weighted 2.5 probes in from its window edge, see sampleProbeIrradiance
+          axis.inner[k] =
+            finer?.origin &&
+            p - s >= (finer.origin[a] + 2.5) * finer.spacing &&
+            p + s <= (finer.origin[a] + finer.grid[a] - 3.5) * finer.spacing
+              ? 1
+              : 0;
+        }
+      }
+      const [ax, ay, az] = this._axes;
+      const near = level.near;
+      const drawn = level.drawn;
+      const wanted = level.wanted;
+      let count = 0;
+      for (let kz = 0; kz < n[2]; kz++) {
+        const sz = az.slot[kz];
+        for (let ky = 0; ky < n[1]; ky++) {
+          const base = n[0] * (ay.slot[ky] + n[1] * sz);
+          const inner = ay.inner[ky] & az.inner[kz];
+          for (let kx = 0; kx < n[0]; kx++) {
+            const i = base + ax.slot[kx];
+            const want = (inner & ax.inner[kx]) === 0 && (near[i] === 1 || drawn[i] >= drawnFrom) ? 1 : 0;
+            wanted[i] = want;
+            count += want;
+          }
+        }
+      }
+      level.wantedCount = count;
+      total += count;
+    }
+    return total;
+  }
+  /** Every probe unclassified, so wanted, until the scene field has settled and updates classify it. @internal */
+  private resetClassification() {
+    for (const level of this._levels) {
+      level.near.fill(1);
+      level.classifyAfter.fill(UNSETTLED);
+      level.drawn.fill(-UNSETTLED);
+    }
+    this._awaitSettle = true;
+  }
+  /**
+   * The scene field holds the scene now: updates from this frame on classify the probes waiting
+   * for it, relocating first, since their distance to the field comes from the relocation.
+   * @internal
+   */
+  private settle() {
+    this._awaitSettle = false;
+    for (const level of this._levels) {
+      for (let i = 0; i < level.count; i++) {
+        if (level.classifyAfter[i] === UNSETTLED) {
+          level.classifyAfter[i] = this._frame;
+          level.lastRelocated[i] = -1000;
+        }
+      }
+    }
+  }
+  /** Geometry changed in a box: the probes within reach of it wait for the field and reclassify. @internal */
+  private onFieldDirty(min: Vector3, max: Vector3) {
+    const reach = this.reach();
+    for (const level of this._levels) {
+      const o = level.origin;
+      if (!o) {
+        continue;
+      }
+      const s = level.spacing;
+      const r = reach * s;
+      const n = level.grid;
+      const x0 = Math.max(o[0], Math.ceil((min.x - r) / s));
+      const y0 = Math.max(o[1], Math.ceil((min.y - r) / s));
+      const z0 = Math.max(o[2], Math.ceil((min.z - r) / s));
+      const x1 = Math.min(o[0] + n[0] - 1, Math.floor((max.x + r) / s));
+      const y1 = Math.min(o[1] + n[1] - 1, Math.floor((max.y + r) / s));
+      const z1 = Math.min(o[2] + n[2] - 1, Math.floor((max.z + r) / s));
+      if (!(x0 <= x1 && y0 <= y1 && z0 <= z1)) {
+        continue;
+      }
+      for (let z = z0; z <= z1; z++) {
+        for (let y = y0; y <= y1; y++) {
+          const base = n[0] * (wrapIndex(y, n[1]) + n[1] * wrapIndex(z, n[2]));
+          for (let x = x0; x <= x1; x++) {
+            const i = base + wrapIndex(x, n[0]);
+            level.near[i] = 1;
+            level.classifyAfter[i] = UNSETTLED;
+            level.lastRelocated[i] = -1000;
+          }
+        }
+      }
+      this._awaitSettle = true;
+    }
+  }
+  /**
+   * Marks the probes within reach of a lit object drawn that the probes' rays cannot see, see
+   * {@link ProbeVolume.drawnCallback}: all of them for an object the scene field does not hold,
+   * those whose reach leaves the field's window for one it does. A batch group taken whole is
+   * marked by its bounds, as one object the field holds unless it holds a lit mesh it does not.
+   * @internal
+   */
+  private markDrawn(node: SceneNode, drawable: Nullable<Drawable>) {
+    let held: boolean;
+    if (drawable) {
+      if (drawable.isUnlit()) {
+        return;
+      }
+      held = this._scene.sdf.holdsStatic(node);
+    } else if (node.isBatchGroup()) {
+      held = !this.groupMarks(node);
+    } else {
+      return;
+    }
+    const bv = node.getWorldBoundingVolume();
+    if (!bv) {
+      return;
+    }
+    const box = bv.toAABB();
+    const min = box.minPoint;
+    const max = box.maxPoint;
+    const fmin = this._fieldMin;
+    const fmax = this._fieldMax;
+    // Wholly inside the field's window, the rays see it
+    if (
+      held &&
+      this._hasField &&
+      min.x >= fmin.x &&
+      min.y >= fmin.y &&
+      min.z >= fmin.z &&
+      max.x <= fmax.x &&
+      max.y <= fmax.y &&
+      max.z <= fmax.z
+    ) {
+      return;
+    }
+    const outsideOnly = held && this._hasField;
+    const frame = this._frame;
+    const reach = this.reach();
+    for (const level of this._levels) {
+      const o = level.origin;
+      if (!o) {
+        continue;
+      }
+      const s = level.spacing;
+      const r = reach * s;
+      const n = level.grid;
+      // Infinite bounds clamp to the window
+      const x0 = Math.max(o[0], Math.ceil((min.x - r) / s));
+      const y0 = Math.max(o[1], Math.ceil((min.y - r) / s));
+      const z0 = Math.max(o[2], Math.ceil((min.z - r) / s));
+      const x1 = Math.min(o[0] + n[0] - 1, Math.floor((max.x + r) / s));
+      const y1 = Math.min(o[1] + n[1] - 1, Math.floor((max.y + r) / s));
+      const z1 = Math.min(o[2] + n[2] - 1, Math.floor((max.z + r) / s));
+      if (!(x0 <= x1 && y0 <= y1 && z0 <= z1)) {
+        continue;
+      }
+      const drawn = level.drawn;
+      for (let z = z0; z <= z1; z++) {
+        const sz = wrapIndex(z, n[2]);
+        const inZ = z * s - r >= fmin.z && z * s + r <= fmax.z;
+        for (let y = y0; y <= y1; y++) {
+          const base = n[0] * (wrapIndex(y, n[1]) + n[1] * sz);
+          const inZY = inZ && y * s - r >= fmin.y && y * s + r <= fmax.y;
+          for (let x = x0; x <= x1; x++) {
+            if (!outsideOnly || !inZY || x * s - r < fmin.x || x * s + r > fmax.x) {
+              drawn[base + wrapIndex(x, n[0])] = frame;
+            }
+          }
+        }
+      }
+    }
+  }
+  /** Whether a batch group holds a lit mesh the scene field does not, kept until either changes. @internal */
+  private groupMarks(group: BatchGroup) {
+    const sdf = this._scene.sdf;
+    const version = sdf.layoutVersion;
+    let entry = this._groupMarks.get(group);
+    if (!entry || entry.tag !== group.changeTag || entry.version !== version) {
+      let marks = false;
+      group.iterate((node) => {
+        marks = node.isMesh() && !node.isUnlit() && !sdf.holdsStatic(node);
+        return marks;
+      });
+      entry = { tag: group.changeTag, version, marks };
+      this._groupMarks.set(group, entry);
+    }
+    return entry.marks;
+  }
+  /** Reads the probes' nearest geometry back every {@link CLASSIFY_EVERY} frames, one read at a time. @internal */
+  private readHits() {
+    const buffer = this._hits;
+    if (!buffer || this._hitsPending || this._hitsFailed || this._frame - this._hitsFrame < CLASSIFY_EVERY) {
+      return;
+    }
+    const requested = this._frame;
+    this._hitsPending = true;
+    this._hitsFrame = requested;
+    buffer
+      .getBufferSubData(new Uint8Array(this._hitsRead.buffer), 0, this._hitsRead.byteLength)
+      .then(() => {
+        if (buffer === this._hits) {
+          this.classify(requested);
+        }
+      })
+      .catch((err) => {
+        // Without readback the probes stay unclassified, all of them updated as before
+        this._hitsFailed = true;
+        console.warn('ProbeVolume: probe classification readback failed', err);
+      })
+      .finally(() => {
+        if (buffer === this._hits) {
+          this._hitsPending = false;
+        }
+      });
+  }
+  /**
+   * Classifies the probes from a readback requested in frame `requested`: geometry within reach
+   * by either the nearest hit of the rays or the distance to the static field. Only probes both
+   * updated and relocated since they started waiting (entering the window, or the field changing
+   * around them) and by that frame, so that both values are of this place and this field.
+   * @internal
+   */
+  private classify(requested: number) {
+    const hits = this._hitsRead;
+    const reach = this.reach();
+    for (const level of this._levels) {
+      for (let i = 0; i < level.count; i++) {
+        const after = level.classifyAfter[i];
+        const updated = level.lastSelected[i];
+        const relocated = level.lastRelocated[i];
+        if (updated >= after && updated <= requested && relocated >= after && relocated <= requested) {
+          const k = (level.tileBase + i) * 2;
+          level.near[i] = Math.min(hits[k], hits[k + 1]) < reach ? 1 : 0;
+        }
+      }
+    }
   }
   /** @internal */
   private randomRotation() {
@@ -846,6 +1262,7 @@ export class ProbeVolume {
           // (rays per probe, probes selected, frame, hysteresis)
           this.rayInfo = pb.vec4().uniform(0);
           this.relocate = pb.uint[0]().storageBufferReadonly(0);
+          this.hits = pb.vec2[0]().storageBuffer(0);
           pb.main(function () {
             this.$l.slot = this.$builtins.globalInvocationId.x;
             this.$if(pb.greaterThanEqual(this.slot, pb.uint(this.rayInfo.y)), function () {
@@ -920,12 +1337,35 @@ export class ProbeVolume {
             // Classification (Majercik et al. 2021, §5): a probe inside geometry is
             // inactive; one out again starts over. Static field only, so dynamic instances turn none off
             this.$l.probeState = this.data.w;
-            this.$if(pb.lessThan(sampleGlobalSDF(this, this.pos, levels), 0), function () {
+            this.$l.fieldDist = sampleGlobalSDF(this, this.pos, levels);
+            this.$if(pb.lessThan(this.fieldDist, 0), function () {
               this.probeState = pb.float(PROBE_STATE_INACTIVE);
             }).$elseif(pb.greaterThan(this.probeState, PROBE_STATE_INACTIVE - 0.5), function () {
               this.probeState = pb.float(0);
             });
             this[PROBE_DATA].setAt(this.index, pb.vec4(this.offset, this.probeState));
+            // Distance to the static field in spacings for ProbeVolume.classify. A read saturated
+            // at the band of the coarsest level only bounds it from below, so says nothing
+            this.$l.fieldBound = pb.mul(
+              this[GLOBAL_SDF_PARAMS].z,
+              this[GLOBAL_SDF_LEVELS].at(levels - 1).w,
+              0.99
+            );
+            this.$l.prevHits = this.hits.at(this.index);
+            this.hits.setAt(
+              this.index,
+              pb.vec2(
+                this.prevHits.x,
+                this.$choice(
+                  pb.and(
+                    pb.greaterThanEqual(this.fieldDist, 0),
+                    pb.lessThan(this.fieldDist, this.fieldBound)
+                  ),
+                  pb.div(this.fieldDist, this.spacing),
+                  pb.float(PROBE_FAR)
+                )
+              )
+            );
           });
         }
       });
@@ -947,6 +1387,7 @@ export class ProbeVolume {
     const bg = this._relocateBindGroup!;
     this.bindCommon(bg, global);
     bg.setBuffer('relocate', relocateBuffer);
+    bg.setBuffer('hits', this._hits!);
     device.setProgram(this._relocateProgram);
     device.setBindGroup(0, bg);
     device.compute(Math.ceil(selected / 64), 1, 1);
@@ -1352,6 +1793,7 @@ export class ProbeVolume {
     for (const [scope, program, bg, current, next, seed] of passes) {
       if (seed) {
         bg.setTexture('seedTex', seed, fetchSampler('clamp_nearest_nomip'));
+        bg.setBuffer('hits', this._hits!);
       }
       bg.setBuffer(PROBE_DATA, this._data!);
       bg.setValue(PROBE_PARAMS, this._params);
@@ -1447,6 +1889,8 @@ export class ProbeVolume {
         if (!visibility) {
           // Seeds of the probes starting over, by selection slot (runSeed)
           this.seedTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          // (nearest ray hit, distance to the field) per probe, see ProbeVolume.classify
+          this.hits = pb.vec2[0]().storageBuffer(0);
         }
         this.next =
           visibility && twoChannel
@@ -1524,6 +1968,10 @@ export class ProbeVolume {
           this.$l.thread = pb.int(
             pb.add(pb.mul(this.$builtins.localInvocationId.y, texels), this.$builtins.localInvocationId.x)
           );
+          if (!visibility) {
+            // Every thread reads every ray, so each finds the same nearest hit
+            this.$l.nearestHit = pb.float(PROBE_FAR);
+          }
           for (let b = 0; b < rays; b += BLEND_BATCH) {
             const count = Math.min(BLEND_BATCH, rays - b);
             // Each thread stages every (texels²)-th ray of the batch
@@ -1547,6 +1995,9 @@ export class ProbeVolume {
               this.$l.ray = this.batchRay.at(this.k);
               this.$l.c = pb.max(pb.dot(this.dir, this.batchDir.at(this.k).xyz), 0);
               accumulate(this);
+              if (!visibility) {
+                this.nearestHit = pb.min(this.nearestHit, pb.abs(this.ray.a));
+              }
             });
             // The next batch overwrites the one still being read
             pb.workgroupBarrier();
@@ -1585,15 +2036,25 @@ export class ProbeVolume {
             // Mark the probe updated; an inactive one stays inactive
             this.$if(pb.equal(this.$builtins.localInvocationId.xy, pb.uvec2(0)), function () {
               this.$l.data = this[PROBE_DATA].at(this.index);
+              this.$l.inactive = pb.greaterThan(this.data.w, PROBE_STATE_INACTIVE - 0.5);
               this[PROBE_DATA].setAt(
                 this.index,
                 pb.vec4(
                   this.data.xyz,
+                  this.$choice(this.inactive, pb.float(PROBE_STATE_INACTIVE), pb.float(1))
+                )
+              );
+              // An inactive probe starts inside geometry: no surface reads it, whatever its rays hit
+              this.$l.prevHits = this.hits.at(this.index);
+              this.hits.setAt(
+                this.index,
+                pb.vec2(
                   this.$choice(
-                    pb.greaterThan(this.data.w, PROBE_STATE_INACTIVE - 0.5),
-                    pb.float(PROBE_STATE_INACTIVE),
-                    pb.float(1)
-                  )
+                    this.inactive,
+                    pb.float(PROBE_FAR),
+                    pb.div(this.nearestHit, probeLevelOrigin(this, this.level).w)
+                  ),
+                  this.prevHits.y
                 )
               );
             });
@@ -1602,6 +2063,11 @@ export class ProbeVolume {
       }
     });
   }
+}
+
+/** Slot of a world probe index in a toroidal window of `m` probes along an axis. */
+function wrapIndex(v: number, m: number) {
+  return ((v % m) + m) % m;
 }
 
 /** First texel of a selection slot's tile in a blend output, {@link STAGING_COLS} tiles a row. */
