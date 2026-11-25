@@ -3,11 +3,12 @@ import type {
   FrameBuffer,
   GPUDataBuffer,
   GPUProgram,
+  PBInsideFunctionScope,
   RenderStateSet,
   Texture3D
 } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import type { Scene } from '../../scene/scene';
 import type { Camera } from '../../camera/camera';
@@ -27,9 +28,11 @@ import {
   sampleGlobalSDFWithVoxel
 } from '../../shaders/sdf';
 import { sdfConeShadow } from '../../shaders/gi';
+import { declareGISunShadowUniforms, GISunShadow, sampleGISunShadow } from './gi_sun_shadow';
 import { declareProbeUniforms, sampleProbeIrradiance } from '../../shaders/probes';
 import { getActiveProbeVolume } from './probe_volume';
 import { ShaderHelper } from '../../material/shader/helper';
+import { RenderGraphExecutor } from '../rendergraph/executor';
 
 /** Most lights the voxels are lit by, the sun aside. */
 export const MAX_VOXEL_LIGHTS = 64;
@@ -82,6 +85,15 @@ export interface VoxelLightingOptions {
    * {@link MAX_SHADOWED_VOXEL_LIGHTS} of them. Default true.
    */
   localLightShadows: boolean;
+  /**
+   * What decides whether a voxel sees the sun. `field` cone-traces the global distance field
+   * (soft, but an opening narrower than about two of the field's voxels is closed to it);
+   * `shadowMap` reads a depth map of the scene rendered along the sun around the camera, which
+   * lets in what the screen's shadows let in, a dome's oculus or a window's tracery, at the cost
+   * of drawing the scene's shadow casters once more each frame. Beyond the map the field is used.
+   * Default `field`.
+   */
+  sunShadowSource?: 'field' | 'shadowMap';
 }
 
 /**
@@ -119,6 +131,7 @@ export class VoxelLighting {
   private readonly _sunColor: Vector4;
   private readonly _params: Vector4;
   private readonly _slab: Vector4;
+  private _sunShadow: Nullable<GISunShadow>;
   constructor(scene: Scene) {
     this._scene = scene;
     this._radiance = null;
@@ -140,6 +153,7 @@ export class VoxelLighting {
     this._sunColor = new Vector4();
     this._params = new Vector4();
     this._slab = new Vector4();
+    this._sunShadow = null;
   }
   /** Outgoing radiance clipmap, rgba16f, laid out like the albedo. */
   get radiance() {
@@ -218,9 +232,29 @@ export class VoxelLighting {
     const probes = getActiveProbeVolume(scene);
     // The sky traces this frame's cloud shadow map later in the frame: the voxels take the last one
     const cloudShadow = scene.env.sky.lastSurfaceCloudShadow;
+    const numLights = this.collectLights(camera, cacheExposure, options.localLightShadows);
+    // The sun shadow map, rendered now: covers the coarsest level's window around the camera
+    const sunShadowMap = options.sunShadowSource === 'shadowMap' && this._sunDir.w > 0.5;
+    if (sunShadowMap) {
+      if (!this._sunShadow) {
+        this._sunShadow = new GISunShadow(scene);
+      }
+      const coarse = global.voxelSize(global.levels - 1) * global.resolution;
+      const fine = global.voxelSize(0) * 2;
+      // A texel per finest material voxel, up to 4096 per side
+      const size = Math.min(4096, Math.max(1024, Math.ceil(coarse / fine) * 2));
+      const half = coarse * 0.5;
+      const dir = new Vector3(this._sunDir.x, this._sunDir.y, this._sunDir.z);
+      RenderGraphExecutor.profileScope('GISunShadow', () =>
+        this._sunShadow!.update(camera.getWorldPosition(), dir, half, coarse * 2, size)
+      );
+    } else if (this._sunShadow) {
+      this._sunShadow.dispose();
+      this._sunShadow = null;
+    }
     const key = `${global.levels}:${scene.lightingMode}:${skyIrradiance ? envLight.getType() : 'none'}:${
       skyIrradiance ? this.envVariant() : ''
-    }:probes${probes ? 1 : 0}:cs${cloudShadow ? 1 : 0}`;
+    }:probes${probes ? 1 : 0}:cs${cloudShadow ? 1 : 0}:sm${sunShadowMap ? 1 : 0}`;
     if (!this._program || this._programKey !== key) {
       this.disposePrograms();
       this._program = this.createProgram(
@@ -229,12 +263,12 @@ export class VoxelLighting {
         skyIrradiance,
         !!probes,
         false,
-        !!cloudShadow
+        !!cloudShadow,
+        sunShadowMap
       );
       this._programKey = key;
       this._bindGroup = device.createBindGroup(this._program.bindGroupLayouts[0]);
     }
-    const numLights = this.collectLights(camera, cacheExposure, options.localLightShadows);
     const slices = Math.max(1, Math.min(resolution, Math.floor(options.slicesPerFrame)));
     const tanHalf = Math.tan((Math.max(0.1, options.sunShadowConeAngle) * Math.PI) / 180);
     this._params.setXYZW(numLights, envStrength, tanHalf, 0);
@@ -262,6 +296,9 @@ export class VoxelLighting {
           cloudShadow.uniforms,
           cloudShadow.surfaceStrength
         );
+      }
+      if (sunShadowMap) {
+        this._sunShadow!.applyBindGroup(bg);
       }
     };
     if (!this._renderStates) {
@@ -301,7 +338,8 @@ export class VoxelLighting {
           skyIrradiance,
           !!probes,
           true,
-          !!cloudShadow
+          !!cloudShadow,
+          sunShadowMap
         );
         this._brickBindGroup = device.createBindGroup(this._brickProgram.bindGroupLayouts[0]);
       }
@@ -329,6 +367,8 @@ export class VoxelLighting {
     this.disposePrograms();
     this._brickBuffer?.dispose();
     this._brickBuffer = null;
+    this._sunShadow?.dispose();
+    this._sunShadow = null;
   }
   /** @internal */
   private disposePrograms() {
@@ -437,7 +477,8 @@ export class VoxelLighting {
     skyIrradiance: boolean,
     useProbes: boolean,
     bricks: boolean,
-    cloudShadow: boolean
+    cloudShadow: boolean,
+    sunShadowMap: boolean
   ) {
     const scene = this._scene;
     const envLight = scene.env.light.envLight;
@@ -482,6 +523,9 @@ export class VoxelLighting {
         }
         if (cloudShadow) {
           ShaderHelper.declareCloudShadowUniforms(pb);
+        }
+        if (sunShadowMap) {
+          declareGISunShadowUniforms(this, 0);
         }
         pb.func('Z_pointAttenuation', [pb.vec3('p'), pb.vec4('posRange')], function () {
           this.$l.d = pb.sub(this.p, this.posRange.xyz);
@@ -622,17 +666,34 @@ export class VoxelLighting {
                 pb.mul(pb.sign(this.L), this.vs, 0.48),
                 pb.mul(this.L, this.vs, 0.4)
               );
-              this.$l.shadow = sdfConeShadow(
-                this,
-                this.ps,
-                this.L,
-                this.params.z,
-                this.vs,
-                pb.mul(this[GLOBAL_SDF_PARAMS].x, this[GLOBAL_SDF_LEVELS].at(levels - 1).w, 0.5),
-                levels,
-                SHADOW_STEPS,
-                this.level
-              );
+              const coneShadow = (scope: PBInsideFunctionScope) =>
+                sdfConeShadow(
+                  scope,
+                  scope.ps,
+                  scope.L,
+                  scope.params.z,
+                  scope.vs,
+                  pb.mul(scope[GLOBAL_SDF_PARAMS].x, scope[GLOBAL_SDF_LEVELS].at(levels - 1).w, 0.5),
+                  levels,
+                  SHADOW_STEPS,
+                  scope.level
+                );
+              if (sunShadowMap) {
+                // The depth map along the sun; a voxel is lit as far as any of its open faces is,
+                // so test from its centre pushed half a voxel towards the light, the PCF spanning
+                // the voxel. Outside the map, the field
+                this.$l.shadow = sampleGISunShadow(
+                  this,
+                  pb.add(this.p, pb.mul(this.L, this.half)),
+                  this.half,
+                  this.half
+                );
+                this.$if(pb.lessThan(this.shadow, -0.5), function () {
+                  this.shadow = coneShadow(this);
+                });
+              } else {
+                this.$l.shadow = coneShadow(this);
+              }
               if (cloudShadow) {
                 // Volumetric cloud shadow, as surfaces take it, for the sun the map was traced for
                 this.$if(ShaderHelper.isCloudShadowLight(this, this.sunDir.xyz), function () {

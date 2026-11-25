@@ -54,7 +54,12 @@ export class SceneGI {
     this._voxels = null;
     this._atlasSize = 256;
     this._voxelizeBudget = 8;
-    this._lighting = { sunShadowConeAngle: 0.5357, slicesPerFrame: 8, localLightShadows: true };
+    this._lighting = {
+      sunShadowConeAngle: 0.5357,
+      slicesPerFrame: 8,
+      localLightShadows: true,
+      sunShadowSource: 'field'
+    };
     this._probeOptions = {
       grid: [32, 16, 32],
       spacing: 1,
@@ -254,6 +259,18 @@ export class SceneGI {
   }
   set localLightShadows(val: boolean) {
     this._lighting.localLightShadows = !!val;
+  }
+  /**
+   * What decides whether the bounced light sees the sun: `field` cone-traces the distance field
+   * (soft; closes openings narrower than about two of its voxels), `shadowMap` reads a depth map
+   * rendered along the sun (lets in small openings such as an oculus or window tracery, for one
+   * more draw of the shadow casters per frame). Default `field`.
+   */
+  get sunShadowSource(): 'field' | 'shadowMap' {
+    return this._lighting.sunShadowSource ?? 'field';
+  }
+  set sunShadowSource(val: 'field' | 'shadowMap') {
+    this._lighting.sunShadowSource = val === 'shadowMap' ? 'shadowMap' : 'field';
   }
   /** Z slices of every clipmap level lit per frame; the voxel lighting is refreshed every `64 / slices` frames. */
   get lightingSlicesPerFrame() {

@@ -166,6 +166,26 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'GISunShadowSource',
+          description:
+            'What decides whether the bounced light sees the sun. Distance field is soft but closes openings smaller than about half a metre near the camera; Shadow map lets in small openings such as a dome oculus or window tracery, for one more draw of the shadow casters per frame.',
+          type: 'string',
+          default: 'field',
+          options: {
+            group: 'Global Illumination',
+            enum: { labels: ['Distance field', 'Shadow map'], values: ['field', 'shadowMap'] }
+          },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.str[0] = this.gi.sunShadowSource;
+          },
+          set(this: Scene, value) {
+            this.gi.sunShadowSource = value.str[0] as 'field' | 'shadowMap';
+          }
+        },
+        {
           name: 'GIIntensity',
           description:
             'Strength of the bounced light the probes add. 1 is physically consistent with the direct lighting; raise to exaggerate colour bleeding, lower to tone it down.',
