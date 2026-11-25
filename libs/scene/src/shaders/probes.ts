@@ -15,7 +15,7 @@ export const PROBE_PARAMS = 'zProbeParams';
 /** Most clipmap levels of a probe volume. @internal */
 export const PROBE_MAX_LEVELS = 4;
 /** vec4s of {@link PROBE_PARAMS}. @internal */
-export const PROBE_PARAM_VEC4S = 3 + 2 * PROBE_MAX_LEVELS;
+export const PROBE_PARAM_VEC4S = 4 + 2 * PROBE_MAX_LEVELS;
 
 /**
  * Declares the probe volume uniforms.
@@ -27,11 +27,13 @@ export const PROBE_PARAM_VEC4S = 3 + 2 * PROBE_MAX_LEVELS;
  * - params[0]: (levels, tiles per atlas row, irrTexels, visTexels),
  *   params[1]: (irradiance atlas size, visibility atlas size),
  *   params[2]: (read scale = GI intensity, normal bias, view bias, max ray distance),
- *   params[3 + 2l]: (world index of level l's first probe, spacing),
- *   params[4 + 2l]: (probes per axis of level l, first tile).
+ *   params[3]: (window anchor: the camera position the windows were last placed around),
+ *   params[4 + 2l]: (world index of level l's first probe, spacing),
+ *   params[5 + 2l]: (probes per axis of level l, first tile).
  *
  * Levels are camera-centred clipmap windows addressed toroidally by world index; tile index
- * (also indexing `data`) = first tile + `x + nx (y + ny z)` of the texel.
+ * (also indexing `data`) = first tile + `x + nx (y + ny z)` of the texel. A window moves a
+ * spacing at a time with its centre within half a spacing of the anchor on each axis.
  * @internal
  */
 export function declareProbeUniforms(scope: PBGlobalScope, group: number, writable = false) {
@@ -49,13 +51,13 @@ export function declareProbeUniforms(scope: PBGlobalScope, group: number, writab
 /** (world index of the level's first probe, spacing). @internal */
 export function probeLevelOrigin(scope: PBInsideFunctionScope, level: PBShaderExp | number) {
   const pb = scope.$builder;
-  return scope[PROBE_PARAMS].at(pb.add(pb.mul(pb.int(level), 2), 3)) as PBShaderExp;
+  return scope[PROBE_PARAMS].at(pb.add(pb.mul(pb.int(level), 2), 4)) as PBShaderExp;
 }
 
 /** (probes per axis, first tile) of a level. @internal */
 export function probeLevelGrid(scope: PBInsideFunctionScope, level: PBShaderExp | number) {
   const pb = scope.$builder;
-  return scope[PROBE_PARAMS].at(pb.add(pb.mul(pb.int(level), 2), 4)) as PBShaderExp;
+  return scope[PROBE_PARAMS].at(pb.add(pb.mul(pb.int(level), 2), 5)) as PBShaderExp;
 }
 
 /** Octahedral encoding of a unit vector to [-1, 1]² (Cigolle et al. 2014). @internal */
@@ -329,9 +331,14 @@ function sampleProbeLevel(
 }
 
 /**
- * Probe volume irradiance (E/π, rgb) at a surface; `a` = 1 if any probe answered. The finest
- * level holding the point answers, fading to the next over the outer 0.5-2.5 probe spacings of
- * its window. DDGI (Majercik et al., JCGT 2019, §4);
+ * Probe volume irradiance (E/π, rgb) at a surface; `a` = coverage, for callers to blend their
+ * fallback by. The finest level holding the point answers, fading to the next over its outer
+ * 0.5-2.5 probe spacings; past the last level the fade is left in the coverage, so the volume
+ * fades into the fallback instead of cutting to it. The fade is measured from the anchor, not
+ * the window, which moves a whole spacing at a time and would step the fade with it: the window
+ * edge lies at least (n - 1) / 2 - 0.5 probes from the anchor (Godot SDFGI's cascade blend
+ * likewise). The window edge still bounds it should the anchor stray. DDGI (Majercik et al.,
+ * JCGT 2019, §4);
  *
  * Normal/view biases of params[2] are in probe spacings, scaled per level; the view bias fades
  * out within one spacing of the viewer. `toViewer` runs from point to viewer; feedback mode
@@ -358,6 +365,7 @@ export function sampleProbeIrradiance(
   pb.func(funcName, [pb.vec3('p'), pb.vec3('n'), pb.vec3('toViewer')], function () {
     this.$l.p0 = this[PROBE_PARAMS].at(0);
     this.$l.p2 = this[PROBE_PARAMS].at(2);
+    this.$l.anchor = this[PROBE_PARAMS].at(3).xyz;
     this.$l.levels = pb.int(this.p0.x);
     this.$l.viewDist = pb.length(this.toViewer);
     this.$l.v = pb.div(this.toViewer, pb.max(this.viewDist, 1e-6));
@@ -378,19 +386,26 @@ export function sampleProbeIrradiance(
       );
       this.$l.s = sampleProbeLevel(this, this.l, this.p, this.biased, this.n, mode === 'sky');
       this.$if(pb.greaterThan(this.s.a, 1e-5), function () {
-        // Distance in probes to the window edge
+        // Distance in probes to the edge of the window centred on the anchor, (n - 1) / 2 - 0.5
+        // probes each way, bounded by the actual window's
         this.$l.lg = probeLevelGrid(this, this.l);
         this.$l.g = pb.sub(pb.div(this.biased, this.lo.w), this.lo.xyz);
         this.$l.edge = pb.min(this.g, pb.sub(pb.sub(this.lg.xyz, pb.vec3(1)), this.g));
+        this.edge = pb.min(
+          this.edge,
+          pb.sub(
+            pb.sub(pb.mul(this.lg.xyz, 0.5), pb.vec3(1)),
+            pb.abs(pb.div(pb.sub(this.biased, this.anchor), this.lo.w))
+          )
+        );
         this.$l.t = pb.smoothStep(0.5, 2.5, pb.min(pb.min(this.edge.x, this.edge.y), this.edge.z));
         this.$l.share = pb.mul(this.t, pb.sub(1, this.accW));
         this.acc = pb.add(this.acc, pb.mul(this.s.rgb, this.share));
         this.accW = pb.add(this.accW, this.share);
       });
     });
-    this.$l.valid = this.$choice(pb.greaterThan(this.accW, 1e-4), pb.float(1), pb.float(0));
     this.$l.e = pb.div(this.acc, pb.max(this.accW, 1e-4));
-    this.$return(pb.vec4(mode === 'surface' ? pb.mul(this.e, this.p2.x) : this.e, this.valid));
+    this.$return(pb.vec4(mode === 'surface' ? pb.mul(this.e, this.p2.x) : this.e, this.accW));
   });
   return scope[funcName](worldPos, normal, toViewer) as PBShaderExp;
 }

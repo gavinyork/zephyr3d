@@ -257,6 +257,8 @@ export class ProbeVolume {
   private _updates: number;
   private _lastUpdated: number;
   private readonly _params: Float32Array<ArrayBuffer>;
+  /** The camera position the windows were last placed around, see {@link ProbeVolume.moveWindow}. */
+  private readonly _anchor: Vector3;
   /** Live camera exposure over the cache exposure, see {@link ProbeVolume.setReadExposure}. */
   private _exposureScale: number;
   private readonly _rotation: Vector4;
@@ -354,6 +356,7 @@ export class ProbeVolume {
     this._updates = 0;
     this._lastUpdated = 0;
     this._params = new Float32Array(new ArrayBuffer(PROBE_PARAM_VEC4S * 16));
+    this._anchor = new Vector3(0, 0, 0);
     this._exposureScale = 1;
     this._rotation = new Vector4(0, 0, 0, 1);
     this._prng = new PRNG(1234);
@@ -470,6 +473,7 @@ export class ProbeVolume {
       this._listenedSDF = sdf;
     }
     const cameraPos = camera.getWorldPosition();
+    this._anchor.set(cameraPos);
     for (const level of this._levels) {
       this.moveWindow(level, cameraPos);
     }
@@ -688,6 +692,10 @@ export class ProbeVolume {
         level.state[i] = data[(level.tileBase + i) * 4 + 3] > 0.5 ? 1 : 0;
       }
     });
+    // The finest window's centre, until the next update places the windows around the camera
+    const finest = this._levels[0];
+    const centre = (a: number) => (finest.origin![a] + (finest.grid[a] - 1) / 2) * finest.spacing;
+    this._anchor.setXYZ(centre(0), centre(1), centre(2));
     this.resetClassification();
     this.updateParams();
     this._updates = Math.max(this._updates, 1);
@@ -805,14 +813,19 @@ export class ProbeVolume {
     }
     this.resetClassification();
   }
-  /** Re-centres a level's window on the camera, a spacing at a time; probes that entered start over. @internal */
+  /**
+   * Re-centres a level's window on the camera, a spacing at a time, its centre (first probe plus
+   * (n - 1) / 2) within half a spacing of the camera on each axis, as the fade of
+   * sampleProbeIrradiance assumes; probes that entered start over.
+   * @internal
+   */
   private moveWindow(level: ProbeLevel, cameraPos: Vector3) {
     const s = level.spacing;
     const n = level.grid;
     const next: [number, number, number] = [
-      Math.floor(cameraPos.x / s) - (n[0] >> 1),
-      Math.floor(cameraPos.y / s) - (n[1] >> 1),
-      Math.floor(cameraPos.z / s) - (n[2] >> 1)
+      Math.floor(cameraPos.x / s - n[0] / 2 + 1),
+      Math.floor(cameraPos.y / s - n[1] / 2 + 1),
+      Math.floor(cameraPos.z / s - n[2] / 2 + 1)
     ];
     const prev = level.origin;
     if (prev && prev[0] === next[0] && prev[1] === next[1] && prev[2] === next[2]) {
@@ -957,17 +970,18 @@ export class ProbeVolume {
       const finer = l > 0 ? this._levels[l - 1] : null;
       for (let a = 0; a < 3; a++) {
         const axis = this._axes[a];
+        // A finer level is fully weighted 2.5 probes in from its edge, see sampleProbeIrradiance
+        const fullWeight = (x: number) => {
+          const g = x / finer!.spacing - finer!.origin![a];
+          const fromAnchor = finer!.grid[a] / 2 - 1 - Math.abs(x - this._anchor[a]) / finer!.spacing;
+          return Math.min(g, finer!.grid[a] - 1 - g, fromAnchor) >= 2.5;
+        };
         for (let k = 0; k < n[a]; k++) {
           const w = origin[a] + k;
           const p = w * s;
           axis.slot[k] = wrapIndex(w, n[a]);
-          // A finer level is fully weighted 2.5 probes in from its window edge, see sampleProbeIrradiance
-          axis.inner[k] =
-            finer?.origin &&
-            p - s >= (finer.origin[a] + 2.5) * finer.spacing &&
-            p + s <= (finer.origin[a] + finer.grid[a] - 3.5) * finer.spacing
-              ? 1
-              : 0;
+          // The edge distance is concave in x, so the ends of the probe's footprint decide
+          axis.inner[k] = finer?.origin && fullWeight(p - s) && fullWeight(p + s) ? 1 : 0;
         }
       }
       const [ax, ay, az] = this._axes;
@@ -1215,10 +1229,11 @@ export class ProbeVolume {
       4
     );
     p.set([o.intensity * this._exposureScale, o.normalBias, o.viewBias, o.maxRayDistance], 8);
+    p.set([this._anchor.x, this._anchor.y, this._anchor.z, 0], 12);
     this._levels.forEach((level, l) => {
       const origin = level.origin ?? [0, 0, 0];
-      p.set([origin[0], origin[1], origin[2], level.spacing], 12 + l * 8);
-      p.set([level.grid[0], level.grid[1], level.grid[2], level.tileBase], 16 + l * 8);
+      p.set([origin[0], origin[1], origin[2], level.spacing], 16 + l * 8);
+      p.set([level.grid[0], level.grid[1], level.grid[2], level.tileBase], 20 + l * 8);
     });
   }
   /** @internal */
