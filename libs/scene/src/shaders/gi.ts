@@ -123,6 +123,12 @@ export function storeVoxelMaterial(
  * atlases after projecting the point onto the surface along the baked field's gradient.
  * No coverage, or no material slot (`matSlot.w <= 0`), gives alpha 0.
  *
+ * `footprint`, when given, is the edge in local units of the region the result stands for:
+ * where it spans more than two of the instance's material voxels, the albedo is the
+ * coverage-weighted mean of a 4x4 grid over that edge in the surface's tangent plane, so
+ * a coarse voxel gets the surface's average colour rather than whatever pattern lies under
+ * its centre (the box-filtered footprint a mip would give). Emissive stays a point read.
+ *
  * Declares locals `outAlbedo` (vec4, a = 1 where valid) and `outEmissive` (vec3).
  * @internal
  */
@@ -140,7 +146,8 @@ export function sampleInstanceMaterial(
   matEmissive: PBShaderExp,
   matAtlasInvSize: PBShaderExp,
   outAlbedo: string,
-  outEmissive: string
+  outEmissive: string,
+  footprint?: PBShaderExp
 ) {
   const pb = scope.$builder;
   scope.$l[outAlbedo] = pb.vec4(0);
@@ -198,6 +205,7 @@ export function sampleInstanceMaterial(
     // the best covered of three samples along the normal
     this.$l.gmA = pb.vec4(0);
     this.$l.gmUVW = pb.vec3(0);
+    this.$l.gmK = pb.float(0);
     for (const [k, tag] of [
       [0, 'On'],
       [-0.5, 'In'],
@@ -213,7 +221,62 @@ export function sampleInstanceMaterial(
       this.$if(pb.greaterThan(this[`gmA${tag}`].a, this.gmA.a), function () {
         this.gmA = this[`gmA${tag}`];
         this.gmUVW = this[`gmUVW${tag}`];
+        this.gmK = pb.float(k);
       });
+    }
+    if (footprint) {
+      // Box filter over the footprint on the chosen shell: rgb is coverage-premultiplied
+      // (empty voxels are 0), so the sums' ratio is the coverage-weighted mean
+      this.$if(
+        pb.and(pb.greaterThan(this.gmA.a, 0.02), pb.greaterThan(footprint, pb.mul(this.gmH, 4))),
+        function () {
+          this.$l.gmUp = this.$choice(
+            pb.lessThan(pb.abs(this.gmN.y), 0.9),
+            pb.vec3(0, 1, 0),
+            pb.vec3(1, 0, 0)
+          );
+          this.$l.gmT1 = pb.normalize(pb.cross(this.gmN, this.gmUp));
+          this.$l.gmT2 = pb.cross(this.gmN, this.gmT1);
+          this.$l.gmC = pb.add(this.gmS, pb.mul(this.gmN, this.gmH, pb.mul(this.gmK, 2)));
+          this.$l.gmSum = pb.vec4(0);
+          this.$for(pb.int('gmI'), 0, 4, function () {
+            this.$for(pb.int('gmJ'), 0, 4, function () {
+              this.$l.gmQ = pb.add(
+                this.gmC,
+                pb.mul(this.gmT1, pb.mul(pb.sub(pb.div(pb.add(pb.float(this.gmI), 0.5), 4), 0.5), footprint)),
+                pb.mul(this.gmT2, pb.mul(pb.sub(pb.div(pb.add(pb.float(this.gmJ), 0.5), 4), 0.5), footprint))
+              );
+              this.$l.gmQF = pb.div(pb.sub(this.gmQ, bmin.xyz), pb.mul(this.gmH, 2));
+              // Taps past the instance's box read nothing rather than its clamped border
+              this.$if(
+                pb.and(
+                  pb.all(pb.greaterThanEqual(this.gmQF, pb.vec3(0))),
+                  pb.all(pb.lessThanEqual(this.gmQF, matRes.xyz))
+                ),
+                function () {
+                  this.gmSum = pb.add(
+                    this.gmSum,
+                    pb.textureSampleLevel(
+                      matAlbedo,
+                      pb.mul(
+                        pb.add(
+                          matSlot.xyz,
+                          pb.clamp(this.gmQF, pb.vec3(0.5), pb.sub(matRes.xyz, pb.vec3(0.5)))
+                        ),
+                        matAtlasInvSize
+                      ),
+                      0
+                    )
+                  );
+                }
+              );
+            });
+          });
+          this.$if(pb.greaterThan(this.gmSum.a, 0.02), function () {
+            this.gmA = pb.vec4(this.gmSum.rgb, this.gmSum.a);
+          });
+        }
+      );
     }
     this.$if(pb.greaterThan(this.gmA.a, 0.02), function () {
       this[outAlbedo] = pb.vec4(pb.div(this.gmA.rgb, this.gmA.a), 1);

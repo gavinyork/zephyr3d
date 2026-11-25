@@ -1,4 +1,12 @@
-import type { BindGroup, GPUDataBuffer, GPUProgram, Texture2D, Texture3D } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  GPUDataBuffer,
+  GPUProgram,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D,
+  Texture3D
+} from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
@@ -21,6 +29,7 @@ import {
   SDF_INSTANCE_VEC4S,
   globalSDFFormat,
   isGlobalSDFFilterable,
+  sampleInstanceField,
   sampleInstancesSDF,
   sampleSceneSDF
 } from '../../shaders/sdf';
@@ -966,6 +975,78 @@ export class GlobalSDF {
                   pb.lessThan(this.terrainD, this.band),
                   pb.lessThan(this.terrainD, this.instD)
                 );
+                // The point the material is read at. A ray reads the surface facing the open
+                // side, so step out of the nearest instance along its gradient by a field voxel
+                // and pick again: a thin overlay (a rug on a floor, a hanging on a wall) then
+                // wins over the surface it covers even where the voxel centre lies on that
+                // surface, which the nearest-to-centre pick alone settles by alignment
+                this.$l.pm = this.pc;
+                this.$if(
+                  pb.and(pb.greaterThanEqual(this.bestK, 0), pb.lessThan(this.instD, this.band)),
+                  function () {
+                    this.$l.nIdx = this.indices.at(pb.add(this.start, pb.uint(this.bestK)));
+                    this.$l.nBase = pb.mul(this.nIdx, SDF_INSTANCE_VEC4S);
+                    this.$l.n0 = this.instances.at(this.nBase);
+                    this.$l.n1 = this.instances.at(pb.add(this.nBase, 1));
+                    this.$l.n2 = this.instances.at(pb.add(this.nBase, 2));
+                    this.$l.nbmin = this.instances.at(pb.add(this.nBase, 3));
+                    this.$l.nbmax = this.instances.at(pb.add(this.nBase, 4));
+                    this.$l.nslot = this.instances.at(pb.add(this.nBase, 5));
+                    this.$l.npc4 = pb.vec4(this.pc, 1);
+                    this.$l.nlp = pb.vec3(
+                      pb.dot(this.n0, this.npc4),
+                      pb.dot(this.n1, this.npc4),
+                      pb.dot(this.n2, this.npc4)
+                    );
+                    this.$l.nh = this.nbmin.w;
+                    const field = (scope: PBInsideFunctionScope, q: PBShaderExp) =>
+                      sampleInstanceField(
+                        scope,
+                        q,
+                        scope.nbmin,
+                        scope.nbmax,
+                        scope.nslot,
+                        scope.atlas,
+                        scope.atlasInvSize.xyz
+                      );
+                    this.$l.nd0 = field(this, this.nlp);
+                    this.$l.ng = pb.vec3(
+                      pb.sub(field(this, pb.add(this.nlp, pb.vec3(this.nh, 0, 0))), this.nd0),
+                      pb.sub(field(this, pb.add(this.nlp, pb.vec3(0, this.nh, 0))), this.nd0),
+                      pb.sub(field(this, pb.add(this.nlp, pb.vec3(0, 0, this.nh))), this.nd0)
+                    );
+                    // World gradient of a field in local space: the world-to-local rows transposed
+                    this.$l.nw = pb.add(
+                      pb.mul(this.n0.xyz, this.ng.x),
+                      pb.mul(this.n1.xyz, this.ng.y),
+                      pb.mul(this.n2.xyz, this.ng.z)
+                    );
+                    this.$l.nlen = pb.length(this.nw);
+                    this.$if(pb.greaterThan(this.nlen, 1e-6), function () {
+                      this.$l.pOut = pb.add(this.pc, pb.mul(this.nw, pb.div(this.vs, this.nlen)));
+                      this.$l.bestOut = pb.int(-1);
+                      this.$l.dOut = sampleInstancesSDF(
+                        this,
+                        this.pOut,
+                        this.count,
+                        this.band,
+                        (scope, k) => pb.mul(scope.indices.at(pb.add(scope.start, k)), SDF_INSTANCE_VEC4S),
+                        (scope, i) => scope.instances.at(i),
+                        this.atlas,
+                        this.atlasInvSize.xyz,
+                        pb.mul(this.vs, 0.5),
+                        'bestOut'
+                      );
+                      this.$if(
+                        pb.and(pb.greaterThanEqual(this.bestOut, 0), pb.notEqual(this.bestOut, this.bestK)),
+                        function () {
+                          this.bestK = this.bestOut;
+                          this.pm = this.pOut;
+                        }
+                      );
+                    });
+                  }
+                );
                 this.$l.useInst = pb.and(
                   pb.greaterThanEqual(this.bestK, 0),
                   pb.lessThan(this.instD, this.band),
@@ -989,11 +1070,20 @@ export class GlobalSDF {
                   pb.vec4(0)
                 );
                 this.$l.matRes = this.materialSlots.at(pb.add(pb.mul(this.idx, 2), 1));
-                this.$l.pc4 = pb.vec4(this.pc, 1);
+                this.$l.pc4 = pb.vec4(this.pm, 1);
                 this.$l.lp = pb.vec3(
                   pb.dot(this.mr0, this.pc4),
                   pb.dot(this.mr1, this.pc4),
                   pb.dot(this.mr2, this.pc4)
+                );
+                // The material voxel's edge (two field voxels) in the instance's local units,
+                // which its albedo is averaged over
+                this.$l.mfoot = pb.mul(
+                  this.vs,
+                  pb.div(
+                    pb.add(pb.length(this.mr0.xyz), pb.length(this.mr1.xyz), pb.length(this.mr2.xyz)),
+                    1.5
+                  )
                 );
                 sampleInstanceMaterial(
                   this,
@@ -1009,7 +1099,8 @@ export class GlobalSDF {
                   this.matEmissiveAtlas,
                   this.matAtlasInvSize.xyz,
                   'outAlbedo',
-                  'outEmissive'
+                  'outEmissive',
+                  this.mfoot
                 );
                 this.$if(this.terrainWins, function () {
                   // The capture's mip whose texels match the material voxel (two field voxels),
