@@ -238,9 +238,33 @@ export function probeActive(scope: PBInsideFunctionScope, data: PBShaderExp) {
 }
 
 /**
+ * A probe starting over counts its updates in its state: 1 + count / PROBE_AGE_SCALE while young,
+ * exactly 1 once mature (and in states saved before ages were kept). See ProbeVolume.
+ * @internal
+ */
+export const PROBE_AGE_SCALE = 128;
+/**
+ * Updates over which a young probe's share of its level ramps up when read, the level above
+ * answering for the rest: a few updates' worth of rays are far noisier than a converged probe.
+ * @internal
+ */
+export const PROBE_FADE_UPDATES = 16;
+
+/** How far a probe has converged for reading, 0..1, from its state. @internal */
+export function probeMaturity(scope: PBInsideFunctionScope, data: PBShaderExp) {
+  const pb = scope.$builder;
+  return scope.$choice(
+    pb.and(pb.greaterThan(data.w, 1.001), pb.lessThan(data.w, 1.5)),
+    pb.clamp(pb.div(pb.mul(pb.sub(data.w, 1), PROBE_AGE_SCALE), PROBE_FADE_UPDATES), 0, 1),
+    pb.float(1)
+  ) as PBShaderExp;
+}
+
+/**
  * Irradiance from one volume level: the eight surrounding probes weighted by trilinear,
- * wrap-facing and Chebyshev visibility (DDGI). Returns (irradiance, weight sum); sum 0 when
- * outside the window or no probe is active.
+ * wrap-facing and Chebyshev visibility (DDGI), and by their maturity, see {@link probeMaturity}.
+ * Returns (irradiance, maturity): the maturity is the weighted mean of the probes', 0 when outside
+ * the window or no probe is active.
  * @internal
  */
 function sampleProbeLevel(
@@ -264,6 +288,7 @@ function sampleProbeLevel(
     this.$l.g = pb.sub(pb.div(this.biased, this.spacing), pb.vec3(this.origin));
     this.$l.sum = pb.vec3(0);
     this.$l.wsum = pb.float(0);
+    this.$l.wfull = pb.float(0);
     this.$l.inside = pb.and(
       pb.all(pb.greaterThanEqual(this.g, pb.vec3(0))),
       pb.all(pb.lessThanEqual(this.g, pb.sub(pb.vec3(this.n3), pb.vec3(1))))
@@ -320,12 +345,19 @@ function sampleProbeLevel(
             this.p1.xy,
             this.n
           );
+          this.wfull = pb.add(this.wfull, this.w);
+          this.w = pb.mul(this.w, probeMaturity(this, this[`d${i}`]));
           this.sum = pb.add(this.sum, pb.mul(sky ? pb.vec3(this.irr.a) : this.irr.rgb, this.w));
           this.wsum = pb.add(this.wsum, this.w);
         });
       }
     });
-    this.$return(pb.vec4(pb.div(this.sum, pb.max(this.wsum, 1e-5)), this.wsum));
+    this.$return(
+      pb.vec4(
+        pb.div(this.sum, pb.max(this.wsum, 1e-5)),
+        this.$choice(pb.greaterThan(this.wfull, 1e-5), pb.div(this.wsum, this.wfull), pb.float(0))
+      )
+    );
   });
   return scope[funcName](level, p, biased, n) as PBShaderExp;
 }
@@ -333,7 +365,8 @@ function sampleProbeLevel(
 /**
  * Probe volume irradiance (E/π, rgb) at a surface; `a` = coverage, for callers to blend their
  * fallback by. The finest level holding the point answers, fading to the next over its outer
- * 0.5-2.5 probe spacings; past the last level the fade is left in the coverage, so the volume
+ * 0.5-2.5 probe spacings and where its probes have yet to converge (a level just scrolled over
+ * a place, see {@link probeMaturity}); past the last level the fade is left in the coverage, so the volume
  * fades into the fallback instead of cutting to it. The fade is measured from the anchor, not
  * the window, which moves a whole spacing at a time and would step the fade with it: the window
  * edge lies at least (n - 1) / 2 - 0.5 probes from the anchor (Godot SDFGI's cascade blend
@@ -399,7 +432,9 @@ export function sampleProbeIrradiance(
           )
         );
         this.$l.t = pb.smoothStep(0.5, 2.5, pb.min(pb.min(this.edge.x, this.edge.y), this.edge.z));
-        this.$l.share = pb.mul(this.t, pb.sub(1, this.accW));
+        // The last level has none above to answer for its young probes
+        this.$l.maturity = this.$choice(pb.equal(this.l, pb.sub(this.levels, 1)), pb.float(1), this.s.a);
+        this.$l.share = pb.mul(this.t, this.maturity, pb.sub(1, this.accW));
         this.acc = pb.add(this.acc, pb.mul(this.s.rgb, this.share));
         this.accW = pb.add(this.accW, this.share);
       });

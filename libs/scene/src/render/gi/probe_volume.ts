@@ -53,6 +53,7 @@ import {
   PROBE_MAX_LEVELS,
   PROBE_PARAM_VEC4S,
   PROBE_PARAMS,
+  PROBE_AGE_SCALE,
   PROBE_STATE_INACTIVE,
   PROBE_VISIBILITY,
   probeActive,
@@ -65,6 +66,7 @@ import {
   probeTileOrigin,
   probeWorldFromTexel,
   quatRotate,
+  sampleProbeTile,
   sphericalFibonacci
 } from '../../shaders/probes';
 
@@ -99,6 +101,18 @@ const UNSETTLED = 0x7fffffff;
 const SELECT_INDEX_MASK = 0x00ffffff;
 const SELECT_LEVEL_SHIFT = 24;
 const SELECT_FIRST_BIT = 0x80000000;
+/**
+ * A probe starting over averages its first updates evenly instead of blending each into the
+ * history at the full hysteresis: the k-th keeps k / (k + 1) of what it had, up to the
+ * hysteresis. A seed from the level above counts as {@link PROBE_SEED_WEIGHT} updates, so it
+ * hides the gap left by a probe entering a window without holding the level above's light (which
+ * leaks through walls its coarser probes cannot resolve) for the hysteresis' whole time constant.
+ * While young, the probe's state (data.w) is 1 + count / {@link PROBE_AGE_SCALE}; 1 is a mature
+ * probe, as every probe was before ages were kept, so saved states load as mature.
+ */
+const PROBE_SEED_WEIGHT = 4;
+/** Updates counted before a probe is mature; under PROBE_AGE_SCALE / 2 to stay below state 1.5. */
+const PROBE_AGE_MAX = 60;
 /** Magic and version of a saved probe state. */
 const STATE_MAGIC = 0x50494a5a; // 'ZJIP'
 /** Bump when the saved layout or meaning changes. */
@@ -1409,9 +1423,10 @@ export class ProbeVolume {
   }
   /**
    * Seeds the irradiance of probes starting over by trilinearly blending the
-   * eight surrounding active probes of the level above; the first update then
-   * blends into the seed with hysteresis. Without a seed, alpha is -1. One
-   * workgroup per selected probe, written by selection slot.
+   * eight surrounding active probes of the level above that see the probe's
+   * position (Chebyshev test on their depth maps); the first update then
+   * averages with it, see {@link PROBE_SEED_WEIGHT}. Without a seed, alpha is -1.
+   * One workgroup per selected probe, written by selection slot.
    * @internal
    */
   private runSeed(selected: number) {
@@ -1425,6 +1440,7 @@ export class ProbeVolume {
           this[PROBE_PARAMS] = pb.vec4[PROBE_PARAM_VEC4S]().uniform(0);
           this.selected = pb.uint[0]().storageBufferReadonly(0);
           this.irradiance = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.visibility = pb.tex2D().uniform(0);
           this.seedOut = pb.texStorage2D.rgba16float().storage(0);
           pb.main(function () {
             this.$l.slot = this.$builtins.workGroupId.x;
@@ -1475,12 +1491,36 @@ export class ProbeVolume {
                         this.parent,
                         probeTexelFromWorld(this, this.parent, this[`pw${i}`])
                       );
-                      this.$if(probeActive(this, this[PROBE_DATA].at(this[`pi${i}`])), function () {
+                      this.$l[`pd${i}`] = this[PROBE_DATA].at(this[`pi${i}`]);
+                      this.$if(probeActive(this, this[`pd${i}`]), function () {
                         this.$l.tri = pb.mul(
                           off[0] ? this.alpha.x : pb.sub(1, this.alpha.x),
                           off[1] ? this.alpha.y : pb.sub(1, this.alpha.y),
                           off[2] ? this.alpha.z : pb.sub(1, this.alpha.z)
                         );
+                        // Only a parent that sees the probe's position: Chebyshev visibility from its
+                        // depth map toward the probe, as surfaces weight probes (DDGI) but without the
+                        // floor, so the light of a parent past a wall does not leak into the seed
+                        this.$l.pp = probePosition(this, this.parent, this[`pw${i}`], this[`pd${i}`]);
+                        this.$l.toChild = pb.sub(this.pos, this.pp);
+                        this.$l.dist = pb.length(this.toChild);
+                        this.$l.vis = sampleProbeTile(
+                          this,
+                          this.visibility,
+                          this[`pi${i}`],
+                          this[PROBE_PARAMS].at(0).w,
+                          this[PROBE_PARAMS].at(1).zw,
+                          pb.div(this.toChild, pb.max(this.dist, 1e-6))
+                        );
+                        this.$if(pb.greaterThan(this.dist, this.vis.x), function () {
+                          this.$l.variance = pb.abs(pb.sub(pb.mul(this.vis.x, this.vis.x), this.vis.y));
+                          this.$l.dd = pb.sub(this.dist, this.vis.x);
+                          this.$l.cheb = pb.div(
+                            this.variance,
+                            pb.add(this.variance, pb.mul(this.dd, this.dd))
+                          );
+                          this.tri = pb.mul(this.tri, this.cheb, this.cheb, this.cheb);
+                        });
                         this.sum = pb.add(
                           this.sum,
                           pb.mul(
@@ -1521,6 +1561,7 @@ export class ProbeVolume {
     bg.setValue(PROBE_PARAMS, this._params);
     bg.setBuffer('selected', this._selected!);
     bg.setTexture('irradiance', this._irradiance!, fetchSampler('clamp_nearest_nomip'));
+    bg.setTexture('visibility', this._visibility!, fetchSampler('clamp_linear_nomip'));
     bg.setTexture('seedOut', this._irradianceSeed!);
     device.setProgram(this._seedProgram);
     device.setBindGroup(0, bg);
@@ -2027,7 +2068,18 @@ export class ProbeVolume {
           this.$l.old = pb.textureLoad(this.current, this.texel, 0);
           this.$l.h = this.$choice(this.first, pb.float(0), this.rayInfo.w);
           if (!visibility) {
-            // A probe starting over blends into its seed, if any (alpha -1 = none)
+            // Updates averaged so far: young probes count theirs, mature ones (state 1) are past it
+            this.$l.young = pb.and(pb.greaterThan(this.probeState, 1.001), pb.lessThan(this.probeState, 1.5));
+            this.$l.count = this.$choice(
+              this.first,
+              pb.float(0),
+              this.$choice(
+                this.young,
+                pb.floor(pb.add(pb.mul(pb.sub(this.probeState, 1), PROBE_AGE_SCALE), 0.5)),
+                pb.float(PROBE_AGE_MAX)
+              )
+            );
+            // A probe starting over takes its seed, if any (alpha -1 = none), as a few updates' worth
             this.$if(this.first, function () {
               this.$l.seedValue = pb.textureLoad(
                 this.seedTex,
@@ -2036,9 +2088,10 @@ export class ProbeVolume {
               );
               this.$if(pb.greaterThanEqual(this.seedValue.a, 0), function () {
                 this.old = this.seedValue;
-                this.h = this.rayInfo.w;
+                this.count = pb.float(PROBE_SEED_WEIGHT);
               });
             });
+            this.h = pb.min(this.rayInfo.w, pb.div(this.count, pb.add(this.count, 1)));
           }
           this.$l.value = pb.mix(this.result, this.old, this.h);
           // Staged by selection slot; runCommit copies the tile into the map
@@ -2052,11 +2105,17 @@ export class ProbeVolume {
             this.$if(pb.equal(this.$builtins.localInvocationId.xy, pb.uvec2(0)), function () {
               this.$l.data = this[PROBE_DATA].at(this.index);
               this.$l.inactive = pb.greaterThan(this.data.w, PROBE_STATE_INACTIVE - 0.5);
+              this.$l.nextCount = pb.add(this.count, 1);
+              this.$l.updated = this.$choice(
+                pb.greaterThanEqual(this.nextCount, PROBE_AGE_MAX),
+                pb.float(1),
+                pb.add(1, pb.div(this.nextCount, PROBE_AGE_SCALE))
+              );
               this[PROBE_DATA].setAt(
                 this.index,
                 pb.vec4(
                   this.data.xyz,
-                  this.$choice(this.inactive, pb.float(PROBE_STATE_INACTIVE), pb.float(1))
+                  this.$choice(this.inactive, pb.float(PROBE_STATE_INACTIVE), this.updated)
                 )
               );
               // An inactive probe starts inside geometry: no surface reads it, whatever its rays hit
