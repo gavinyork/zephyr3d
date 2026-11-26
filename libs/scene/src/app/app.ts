@@ -4,6 +4,7 @@ import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
 import { Engine } from './engine';
 import { getApp, setApp } from './api';
+import { DebugOverlay } from './debugoverlay';
 import type { ScreenConfig } from './screen';
 
 type appEventMap = {
@@ -108,6 +109,10 @@ export interface AppCreationOptions extends AppOptions {
      * Screen configuration
      */
     screen?: ScreenConfig;
+    /**
+     * Hotkey for toggling the debug overlay.
+     */
+    debugOverlayHotkey?: string;
   };
 }
 
@@ -140,6 +145,8 @@ export type LogMode = 'info' | 'warn' | 'error' | 'debug';
 export class Application extends Observable<appEventMap> {
   private readonly _options: RequireOptionals<AppOptions>;
   private _device: Nullable<AbstractDevice>;
+  private _debugOverlay: Nullable<DebugOverlay>;
+  private _debugOverlayHotkey: string | null;
   private readonly _inputManager: InputManager;
   private readonly _engine: Engine;
   private readonly _editorMode: EditorMode;
@@ -178,6 +185,9 @@ export class Application extends Observable<appEventMap> {
     this._device = null;
     this._ready = false;
     this._frameWaiters = [];
+    this._debugOverlay = null;
+    this._debugOverlayHotkey =
+      opt.runtimeOptions?.debugOverlayHotkey ?? this.getCmdLine('debugOverlayHotkey');
   }
   /**
    * Editor mode
@@ -220,6 +230,18 @@ export class Application extends Observable<appEventMap> {
     return this._options.backend.typeName();
   }
   /**
+   * Get a command line parameter from the URL query string.
+   *
+   * @remarks
+   * Returns the value of the first occurrence of the parameter with the given name,
+   * or null if not present. Use this to configure runtime behavior via URL parameters.
+   * @param name - The name of the query parameter to retrieve.
+   * @returns The value of the query parameter, or null if not present.
+   */
+  getCmdLine(name: string): string | null {
+    return new URL(window.location.toString()).searchParams.get(name);
+  }
+  /**
    * Set keyboard focus to the device's canvas element.
    */
   focus() {
@@ -246,6 +268,16 @@ export class Application extends Observable<appEventMap> {
         this._engine.screen.resolveViewport();
         this.dispatchEvent('resize', width, height);
       });
+      if (this._debugOverlayHotkey) {
+        this.on('keyup', (evt) => {
+          if (evt.key === this._debugOverlayHotkey) {
+            if (!this._debugOverlay) {
+              this._debugOverlay = new DebugOverlay(this._device!.canvas);
+            }
+            this._debugOverlay!.visible = !this._debugOverlay!.visible;
+          }
+        });
+      }
       this._ready = true;
     }
   }
@@ -274,6 +306,7 @@ export class Application extends Observable<appEventMap> {
       this._inputManager._beginFrame(dt * 0.001);
       this.dispatchEvent('tick', dt, elapsed);
       this._engine.update(dt * 0.001, elapsed * 0.001);
+      this._debugOverlay?.update(dt * 0.001);
       this._engine.render();
       if (this._frameWaiters.length > 0) {
         // Resolution callbacks run as microtasks, after the caller's endFrame()

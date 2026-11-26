@@ -26,7 +26,10 @@ const CDN_MODEL = 'https://cdn.zephyr3d.org/doc/assets/models/DamagedHelmet.glb'
 const params = new URLSearchParams(location.search);
 const app = new Application({
   canvas: document.querySelector<HTMLCanvasElement>('#canvas')!,
-  backend: params.has('webgl') ? backendWebGL2 : backendWebGPU
+  backend: params.has('webgl') ? backendWebGL2 : backendWebGPU,
+  runtimeOptions: {
+    debugOverlayHotkey: '`'
+  }
 });
 await app.ready();
 

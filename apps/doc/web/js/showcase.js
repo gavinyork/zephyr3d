@@ -51,8 +51,8 @@ async function showHtml() {
 async function showLiveDemo() {
   if (!liveDemo) {
     liveDemo = document.createElement('iframe');
-    liveDemo.src = `tut/${caseName}.html`; //`examples/dist/${el.getAttribute('case')}`
-    liveDemo.style.border = "0";
+    liveDemo.src = `tut/${caseName}.html?debugOverlayHotkey=%60`; //`examples/dist/${el.getAttribute('case')}`
+    liveDemo.style.border = '0';
     liveDemo.style.position = 'absolute';
     liveDemo.style.left = '0px';
     liveDemo.style.right = '0px';
@@ -83,17 +83,19 @@ window.onload = function () {
     const action = function (func) {
       if (!debounce && !this.classList.contains('active')) {
         debounce = true;
-        this.parentElement.querySelectorAll('button').forEach(value => {
+        this.parentElement.querySelectorAll('button').forEach((value) => {
           value.classList.remove('active');
         });
         this.classList.add('active');
-        func().then(() => {
-          debounce = false;
-        }).catch(err => {
-          debounce = false;
-        });
+        func()
+          .then(() => {
+            debounce = false;
+          })
+          .catch((err) => {
+            debounce = false;
+          });
       }
-    }
+    };
     const btnShowJs = document.querySelector('#show-code');
     btnShowJs.addEventListener('click', function () {
       action.call(btnShowJs, showCode);
