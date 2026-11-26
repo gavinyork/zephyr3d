@@ -296,6 +296,13 @@ export class Camera extends SceneNode {
   protected _ISO: number;
   /** @internal Exposure compensation in stops. */
   protected _exposureCompensation: number;
+  /** @internal Auto exposure settings, synced to the tonemap effect every frame. */
+  protected _autoExposure: boolean;
+  protected _autoExposureMinEV: number;
+  protected _autoExposureMaxEV: number;
+  protected _autoExposureBias: number;
+  protected _autoExposureSpeedUp: number;
+  protected _autoExposureSpeedDown: number;
   /** @internal Lighting mode currently reflected by the post effect ordering. */
   protected _postProcessingLightingMode: Nullable<LightingMode>;
   /** @internal Motion blur enable flag (via post effect). */
@@ -531,6 +538,12 @@ export class Camera extends SceneNode {
     this._shutterSpeed = 1 / 125;
     this._ISO = 100;
     this._exposureCompensation = 0;
+    this._autoExposure = false;
+    this._autoExposureMinEV = -8;
+    this._autoExposureMaxEV = 8;
+    this._autoExposureBias = 0;
+    this._autoExposureSpeedUp = 3;
+    this._autoExposureSpeedDown = 1;
     this._postProcessingLightingMode = null;
     this._motionBlur = false;
     this._postEffectMotionBlur = new DRef();
@@ -1029,6 +1042,61 @@ export class Camera extends SceneNode {
   }
   set exposureCompensation(val: number) {
     this._exposureCompensation = val;
+  }
+  /**
+   * Whether the exposure adapts to the brightness of the view, like an eye or a camera.
+   *
+   * @remarks
+   * Meters the view every frame (centre-weighted average of the log luminance) and moves the
+   * exposure towards bringing it to middle grey, within {@link Camera.autoExposureMinEV} and
+   * {@link Camera.autoExposureMaxEV} stops of the camera's own exposure ({@link Camera.toneMapExposure}
+   * in legacy lighting, aperture, shutter and ISO in physical lighting), then offset by
+   * {@link Camera.autoExposureBias}. Needs tone mapping. Default false.
+   */
+  get autoExposure() {
+    return this._autoExposure;
+  }
+  set autoExposure(val: boolean) {
+    this._autoExposure = !!val;
+  }
+  /** Lowest auto exposure adjustment, in stops below the camera's own exposure. Default -8 */
+  get autoExposureMinEV() {
+    return this._autoExposureMinEV;
+  }
+  set autoExposureMinEV(val: number) {
+    this._autoExposureMinEV = val;
+  }
+  /** Highest auto exposure adjustment, in stops above the camera's own exposure. Default 8 */
+  get autoExposureMaxEV() {
+    return this._autoExposureMaxEV;
+  }
+  set autoExposureMaxEV(val: number) {
+    this._autoExposureMaxEV = val;
+  }
+  /** Stops added to the exposure auto exposure settles on; positive brightens. Default 0 */
+  get autoExposureBias() {
+    return this._autoExposureBias;
+  }
+  set autoExposureBias(val: number) {
+    this._autoExposureBias = val;
+  }
+  /** How fast auto exposure adapts to a brighter view, as an exponential rate per second. Default 3 */
+  get autoExposureSpeedUp() {
+    return this._autoExposureSpeedUp;
+  }
+  set autoExposureSpeedUp(val: number) {
+    this._autoExposureSpeedUp = Math.max(0, val);
+  }
+  /** How fast auto exposure adapts to a darker view, as an exponential rate per second. Default 1 */
+  get autoExposureSpeedDown() {
+    return this._autoExposureSpeedDown;
+  }
+  set autoExposureSpeedDown(val: number) {
+    this._autoExposureSpeedDown = Math.max(0, val);
+  }
+  /** Makes auto exposure settle on the next frame at once instead of adapting, after a cut. */
+  resetAutoExposure() {
+    this._postEffectTonemap.get()?.resetAutoExposure();
   }
   /** Photographic EV100 calculated from aperture, shutter time and ISO. */
   get EV100() {
@@ -2152,6 +2220,12 @@ export class Camera extends SceneNode {
     // keeps its plain exposure multiplier.
     const usePhysicalExposure = scene.lightingMode === 'physical';
     tonemap.exposure = usePhysicalExposure ? 1 : this._tonemapExposure;
+    tonemap.autoExposure = this._autoExposure;
+    tonemap.autoExposureMinEV = this._autoExposureMinEV;
+    tonemap.autoExposureMaxEV = this._autoExposureMaxEV;
+    tonemap.autoExposureBias = this._autoExposureBias;
+    tonemap.autoExposureSpeedUp = this._autoExposureSpeedUp;
+    tonemap.autoExposureSpeedDown = this._autoExposureSpeedDown;
     // The chain order no longer depends on the lighting mode: Bloom always precedes Tonemap, so it
     // always works on scene-linear radiance. Only the SSGI histories still care about the switch.
     if (this._postProcessingLightingMode !== scene.lightingMode) {

@@ -374,6 +374,117 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'AutoExposure',
+          description:
+            "Adapts the exposure to the brightness of the view, like an eye or a camera: the view is metered every frame, centre-weighted, and the exposure moves towards bringing its average to middle grey, within the EV limits around the camera's own exposure",
+          type: 'bool',
+          phase: 0,
+          default: false,
+          options: { label: 'Auto Exposure', group: 'PostProcessing/ToneMap' },
+          get(this: Camera, value) {
+            value.bool[0] = this.autoExposure;
+          },
+          set(this: Camera, value) {
+            this.autoExposure = value.bool[0];
+          }
+        },
+        {
+          name: 'AutoExposureMinEV',
+          description:
+            "How far auto exposure may darken, in stops below the camera's own exposure. Raise it to keep bright views from being darkened",
+          type: 'float',
+          phase: 0,
+          default: -8,
+          options: { label: 'Min EV', group: 'PostProcessing/ToneMap', minValue: -16, maxValue: 16 },
+          get(this: Camera, value) {
+            value.num[0] = this.autoExposureMinEV;
+          },
+          set(this: Camera, value) {
+            this.autoExposureMinEV = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return !this.autoExposure;
+          }
+        },
+        {
+          name: 'AutoExposureMaxEV',
+          description:
+            "How far auto exposure may brighten, in stops above the camera's own exposure. Lower it to keep night and dark rooms looking dark",
+          type: 'float',
+          phase: 0,
+          default: 8,
+          options: { label: 'Max EV', group: 'PostProcessing/ToneMap', minValue: -16, maxValue: 16 },
+          get(this: Camera, value) {
+            value.num[0] = this.autoExposureMaxEV;
+          },
+          set(this: Camera, value) {
+            this.autoExposureMaxEV = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return !this.autoExposure;
+          }
+        },
+        {
+          name: 'AutoExposureBias',
+          description:
+            'Stops added to the exposure auto exposure settles on: positive brightens the adapted view, negative darkens it',
+          type: 'float',
+          phase: 0,
+          default: 0,
+          options: {
+            label: 'Bias (EV)',
+            group: 'PostProcessing/ToneMap',
+            minValue: -8,
+            maxValue: 8,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.autoExposureBias;
+          },
+          set(this: Camera, value) {
+            this.autoExposureBias = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return !this.autoExposure;
+          }
+        },
+        {
+          name: 'AutoExposureSpeedUp',
+          description:
+            'How fast auto exposure adapts when the view gets brighter; at 3 it covers 95% of the change in a second',
+          type: 'float',
+          phase: 0,
+          default: 3,
+          options: { label: 'Speed To Bright', group: 'PostProcessing/ToneMap', minValue: 0, maxValue: 20 },
+          get(this: Camera, value) {
+            value.num[0] = this.autoExposureSpeedUp;
+          },
+          set(this: Camera, value) {
+            this.autoExposureSpeedUp = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return !this.autoExposure;
+          }
+        },
+        {
+          name: 'AutoExposureSpeedDown',
+          description:
+            'How fast auto exposure adapts when the view gets darker; at 1 it covers 63% of the change in a second',
+          type: 'float',
+          phase: 0,
+          default: 1,
+          options: { label: 'Speed To Dark', group: 'PostProcessing/ToneMap', minValue: 0, maxValue: 20 },
+          get(this: Camera, value) {
+            value.num[0] = this.autoExposureSpeedDown;
+          },
+          set(this: Camera, value) {
+            this.autoExposureSpeedDown = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return !this.autoExposure;
+          }
+        },
+        {
           name: 'ColorAdjustEnabled',
           type: 'bool',
           phase: 0,
