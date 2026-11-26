@@ -100,6 +100,13 @@ const defaultSkyWorldMatrix = Matrix4x4.identity();
 const SKY_OUTPUT_MAX = 64512 * 0.5;
 /** Volumetric clouds give way to procedural ones this far below the cloud base, in meters */
 const VOLUMETRIC_CLOUD_CEILING_MARGIN = 500;
+/**
+ * How far the sun may move from the sun the environment lighting is being baked for, in degrees,
+ * and how much its color times intensity may change, as a fraction, before the environment is
+ * rebaked at once rather than time-sliced over the next frames
+ */
+const SUN_GRADUAL_REBAKE_ANGLE = 2;
+const SUN_GRADUAL_REBAKE_COLOR = 0.1;
 
 /**
  * The sky renderer
@@ -179,8 +186,11 @@ export class SkyRenderer extends Disposable {
   private readonly _radianceMapWork: DRef<TextureCube>;
   private readonly _radianceFrameBufferWork: DRef<FrameBuffer>;
   private readonly _irradianceSHFBWork: DRef<FrameBuffer>;
-  /** A gradual change (cloud round, 2D cloud wind) asks for a time-sliced rebake */
+  /** A gradual change (cloud round, 2D cloud wind, a sun moving across the sky) asks for a time-sliced rebake */
   private _bakedSkyboxGradual: boolean;
+  /** Sun of the last full rebake or of the time-sliced one last started */
+  private readonly _bakedSunDir: Vector3;
+  private readonly _bakedSunColor: Vector4;
   /** Step of the time-sliced rebake in flight, -1 when idle */
   private _sliceState: number;
   /** Frame the time-sliced rebake last advanced in, so several views advance it once */
@@ -276,6 +286,8 @@ export class SkyRenderer extends Disposable {
     this._radianceFrameBufferWork = new DRef();
     this._irradianceSHFBWork = new DRef();
     this._bakedSkyboxGradual = false;
+    this._bakedSunDir = new Vector3(0, 0, 0);
+    this._bakedSunColor = new Vector4(0, 0, 0, 0);
     this._sliceState = -1;
     this._sliceFrame = -1;
     this._sliceUpdatesIBL = false;
@@ -1120,7 +1132,14 @@ export class SkyRenderer extends Disposable {
     if (!sunDir.equalsTo(this._lastSunDir) || !sunColor.equalsTo(this._lastSunColor)) {
       this._lastSunDir.set(sunDir);
       this._lastSunColor.set(sunColor);
-      this._bakedSkyboxDirty = true;
+      if (this._sunNearBaked(sunDir, sunColor)) {
+        // A sun moving across the sky, as in a time of day cycle, is followed time-sliced: a full
+        // rebake every frame costs milliseconds, and an environment a few frames behind a sun
+        // within a couple of degrees does not show. The visible sky is drawn live either way.
+        this._bakedSkyboxGradual = true;
+      } else {
+        this._bakedSkyboxDirty = true;
+      }
     }
     // The scattering sky seen from the observer changes as the camera climbs or travels across the
     // planet. Re-baking the IBL every frame would be far too expensive, so it waits for thresholds.
@@ -1142,6 +1161,8 @@ export class SkyRenderer extends Disposable {
       // A full rebake supersedes a time-sliced one in flight or asked for
       this._bakedSkyboxGradual = false;
       this._sliceState = -1;
+      this._bakedSunDir.set(sunDir);
+      this._bakedSunColor.set(sunColor);
       // updateBakedSkyMap derives both the IBL and the distant-sky LUT from the fog-free cubemap,
       // before compositing fog. Deriving the distant-sky LUT from the fogged cubemap would feed the
       // fog color back into its own ambient term.
@@ -1412,6 +1433,24 @@ export class SkyRenderer extends Disposable {
       ctx.scene.env.light.irradianceWindow = this._shWindowWeights;
     }
   }
+  /** Whether the sun is close enough to the one the environment is being baked for to follow it time-sliced */
+  private _sunNearBaked(sunDir: Vector3, sunColor: Vector4) {
+    if (!this._bakedSkyboxTexture.get()) {
+      return false;
+    }
+    if (Vector3.dot(sunDir, this._bakedSunDir) < Math.cos((SUN_GRADUAL_REBAKE_ANGLE * Math.PI) / 180)) {
+      return false;
+    }
+    const a = this._bakedSunColor;
+    const b = sunColor;
+    const baked = Math.max(a.x * a.w, a.y * a.w, a.z * a.w);
+    const change = Math.max(
+      Math.abs(b.x * b.w - a.x * a.w),
+      Math.abs(b.y * b.w - a.y * a.w),
+      Math.abs(b.z * b.w - a.z * a.w)
+    );
+    return change <= SUN_GRADUAL_REBAKE_COLOR * baked;
+  }
   /** Whether the scene environment light is still driven by this dynamic sky */
   private _skyDrivesIBL(ctx: DrawContext) {
     const light = ctx.scene.env.light;
@@ -1440,6 +1479,8 @@ export class SkyRenderer extends Disposable {
       this._bakedSkyboxGradual = false;
       this._sliceState = 0;
       this._sliceUpdatesIBL = this._skyDrivesIBL(ctx);
+      this._bakedSunDir.set(this._lastSunDir);
+      this._bakedSunColor.set(this._lastSunColor);
     }
     this._sliceFrame = frame;
     const state = this._sliceState++;
