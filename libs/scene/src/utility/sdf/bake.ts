@@ -459,16 +459,17 @@ function signDistances(
 }
 
 /**
- * Trilinear sample of a baked field at a local position; outside the volume, the nearest border
- * sample plus the distance to the volume.
+ * Trilinear sample of a baked field at a local position; outside the outer sample centres (half a
+ * voxel inside the volume), the nearest border sample plus the distance to it.
  * @public
  */
 export function sampleMeshSDF(sdf: MeshSDFData, x: number, y: number, z: number) {
   const [nx, ny, nz] = sdf.resolution;
   const h = sdf.voxelSize;
-  const cx = Math.min(Math.max(x, sdf.boxMin[0]), sdf.boxMax[0]);
-  const cy = Math.min(Math.max(y, sdf.boxMin[1]), sdf.boxMax[1]);
-  const cz = Math.min(Math.max(z, sdf.boxMin[2]), sdf.boxMax[2]);
+  // Measured from the sample centres the lookup stops at, as sampleInstanceField does
+  const cx = Math.min(Math.max(x, sdf.boxMin[0] + h * 0.5), sdf.boxMax[0] - h * 0.5);
+  const cy = Math.min(Math.max(y, sdf.boxMin[1] + h * 0.5), sdf.boxMax[1] - h * 0.5);
+  const cz = Math.min(Math.max(z, sdf.boxMin[2] + h * 0.5), sdf.boxMax[2] - h * 0.5);
   const outside = Math.hypot(x - cx, y - cy, z - cz);
   const fx = Math.min(Math.max((cx - sdf.boxMin[0]) / h - 0.5, 0), nx - 1);
   const fy = Math.min(Math.max((cy - sdf.boxMin[1]) / h - 0.5, 0), ny - 1);

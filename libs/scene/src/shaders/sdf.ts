@@ -80,6 +80,11 @@ export function declareDynamicSDFUniforms(scope: PBGlobalScope, group: number) {
  * Distance in local units from a local position to one packed instance's field: trilinear
  * atlas lookup inside the box, border value plus box distance outside. `bmin` is (box min,
  * voxel size), `bmax` (box max, world scale), `slot` the atlas slot offset.
+ *
+ * The lookup stops at the outer sample centres, half a voxel inside the box, so the filter
+ * never reads a neighbour's slot; the distance beyond is measured from there too, else the half
+ * voxel between them goes uncounted and a field reads up to that much near around its box edge,
+ * enough to put a coarse floor's field ahead of a rug lying on it.
  * @internal
  */
 export function sampleInstanceField(
@@ -97,15 +102,10 @@ export function sampleInstanceField(
     funcName,
     [pb.vec3('lp'), pb.vec4('bmin'), pb.vec4('bmax'), pb.vec4('slot'), pb.vec3('invSize')],
     function () {
-      this.$l.c = pb.clamp(this.lp, this.bmin.xyz, this.bmax.xyz);
+      this.$l.half = pb.vec3(pb.mul(this.bmin.w, 0.5));
+      this.$l.c = pb.clamp(this.lp, pb.add(this.bmin.xyz, this.half), pb.sub(this.bmax.xyz, this.half));
       this.$l.outside = pb.length(pb.sub(this.lp, this.c));
-      this.$l.res = pb.div(pb.sub(this.bmax.xyz, this.bmin.xyz), this.bmin.w);
-      // Clamped to the outer sample centres, so the filter never reads a neighbour's slot
-      this.$l.f = pb.clamp(
-        pb.div(pb.sub(this.c, this.bmin.xyz), this.bmin.w),
-        pb.vec3(0.5),
-        pb.sub(this.res, pb.vec3(0.5))
-      );
+      this.$l.f = pb.div(pb.sub(this.c, this.bmin.xyz), this.bmin.w);
       this.$l.uvw = pb.mul(pb.add(this.slot.xyz, this.f), this.invSize);
       this.$return(pb.add(pb.textureSampleLevel(atlas, this.uvw, 0).r, this.outside));
     }
