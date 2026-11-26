@@ -2415,6 +2415,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       if (this._cameraAnimationTime >= this._cameraAnimationDuration) {
         const controller = this._animatedCamera.controller as EditorCameraController;
         controller?.syncCameraDistanceToViewCenter?.();
+        // The focus may have carried the camera far: settle the clouds at once rather than
+        // letting them catch up over a couple of seconds
+        this._animatedCamera.scene?.env.sky.notifyCameraCut();
         this._animatedCamera = null;
       }
     }
@@ -4031,6 +4034,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this.controller.model.scene.mainCamera.controller = new EditorCameraController();
       this._postGizmoRenderer.camera = camera;
       this._postGizmoRenderer.node = null;
+      this.controller.model.scene.env.sky.notifyCameraCut();
       eventBus.dispatchEvent('scene_changed');
     }
   }

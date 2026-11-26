@@ -31,6 +31,12 @@ import type { VolumetricCloud } from './volumetric_cloud';
  * it per frame. Three maps rotate: one is being written while the sky blends between the two that
  * were completed last, by the progress of the one being written. Every input of a round (eye,
  * sun, time, parameters) is frozen when it starts so the blocks of one map agree.
+ *
+ * A moving camera, however fast, is followed by the rounds alone. A displacement between two frames
+ * cannot tell a jump from fast travel such as an orbit around a distant pivot, and a whole rebuild
+ * lengthens the next frame and with it the next displacement, so a threshold on it would rebuild
+ * every frame while the camera keeps moving. Jumps are reported by the application instead
+ * ({@link VolumetricCloudSkyCache.invalidate}).
  */
 
 /** A rebuild needs enough steps to resolve cloud edges before the regular rounds finish. */
@@ -252,8 +258,6 @@ export class VolumetricCloudSkyCache extends Disposable {
   private _framesPerUpdate: number;
   private _resolution: number;
   private _inputs: Nullable<RoundInputs>;
-  /** Camera position at the previous update, to tell a jump from travel */
-  private readonly _lastCameraPos: Vector3;
   private _rebuild: boolean;
   private readonly _bindGroups: Map<GPUProgram, BindGroup>;
   private _sphereSamplesUploaded: boolean;
@@ -271,7 +275,6 @@ export class VolumetricCloudSkyCache extends Disposable {
     this._framesPerUpdate = 0;
     this._resolution = 0;
     this._inputs = null;
-    this._lastCameraPos = new Vector3();
     this._rebuild = true;
     this._bindGroups = new Map();
     this._sphereSamplesUploaded = false;
@@ -299,7 +302,7 @@ export class VolumetricCloudSkyCache extends Disposable {
   get densityParams() {
     return this._inputs?.cloud ?? null;
   }
-  /** Forces the next update to rebuild the whole cache at once. */
+  /** Forces the next update to rebuild the whole cache at once, e.g. after the camera jumped. */
   invalidate() {
     this._rebuild = true;
   }
@@ -308,14 +311,12 @@ export class VolumetricCloudSkyCache extends Disposable {
    * a gradual update.
    *
    * @param atmosphere - Current atmosphere parameters (observer frame, sun, luminance units)
-   * @param cameraPos - Camera world position
    * @param time - Seconds, drives the wind
    */
   update(
     params: VolumetricCloud,
     resources: VolumetricCloudResources,
     atmosphere: AtmosphereParams,
-    cameraPos: Immutable<Vector3>,
     time: number
   ) {
     this.roundCompleted = false;
@@ -331,10 +332,9 @@ export class VolumetricCloudSkyCache extends Disposable {
       this._rebuild = true;
     }
     this._ensureMaps();
-    if (!this._rebuild && this._inputs && this._needsRebuild(params, atmosphere, cameraPos)) {
+    if (!this._rebuild && this._inputs && this._needsRebuild(params, atmosphere)) {
       this._rebuild = true;
     }
-    this._lastCameraPos.set(cameraPos);
     if (this._rebuild) {
       this._rebuild = false;
       // Two rounds fill the map blended from and the one
@@ -389,25 +389,13 @@ export class VolumetricCloudSkyCache extends Disposable {
       this._ambient.set(tex);
     }
   }
-  private _needsRebuild(
-    params: VolumetricCloud,
-    atmosphere: AtmosphereParams,
-    cameraPos: Immutable<Vector3>
-  ) {
+  private _needsRebuild(params: VolumetricCloud, atmosphere: AtmosphereParams) {
     const inputs = this._inputs!;
     if (params.version !== inputs.version || params.msOctaves !== inputs.msOctaves) {
       return true;
     }
     // A sudden sun change would otherwise fade in over two rounds
-    if (Vector3.dot(atmosphere.lightDir, inputs.sunDir) < Math.cos((5 * Math.PI) / 180)) {
-      return true;
-    }
-    // A camera jump far enough for the clouds to visibly shift: about ten texels of parallax
-    // under the cloud base. Measured since the last update, not the round start: steady travel,
-    // however fast, is followed by the blending regular rounds instead of full rebuilds.
-    const scale = atmosphere.cameraHeightScale;
-    const moved = Vector3.distance(cameraPos, this._lastCameraPos) * scale;
-    return moved > params.layerBottomAltitude * 0.017;
+    return Vector3.dot(atmosphere.lightDir, inputs.sunDir) < Math.cos((5 * Math.PI) / 180);
   }
   private _bindGroup(program: GPUProgram) {
     let bindGroup = this._bindGroups.get(program);

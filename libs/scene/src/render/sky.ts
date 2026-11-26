@@ -1008,6 +1008,17 @@ export class SkyRenderer extends Disposable {
   invalidate() {
     this._bakedSkyboxDirty = true;
   }
+  /**
+   * Tells the sky the camera jumped rather than moved, as on a cut to another view or a teleport.
+   *
+   * @remarks
+   * The volumetric clouds follow a moving camera gradually, so right after a jump the clouds
+   * overhead take a couple of seconds to settle into place. Calling this redraws them for the new
+   * position on the next frame instead, at the cost of that one frame taking much longer.
+   */
+  notifyCameraCut() {
+    this._volumetricCloudCache.invalidate();
+  }
   /** @internal */
   drawScatteredFog(_ctx: DrawContext) {
     return this.skyType === 'scatter';
@@ -1231,7 +1242,6 @@ export class SkyRenderer extends Disposable {
         this._volumetricCloud,
         this._volumetricCloudResources,
         this._atmosphereParams,
-        ctx.camera.getWorldPosition(),
         ctx.device.frameInfo.elapsedOverall * 0.001
       );
       active = !!this._volumetricCloudCache.toMap;

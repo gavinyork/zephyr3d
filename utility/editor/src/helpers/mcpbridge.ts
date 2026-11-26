@@ -1201,6 +1201,7 @@ function setSceneMainCamera(editor: Editor, camera: Camera): string | null {
       view._postGizmoRenderer.camera = camera;
       view._postGizmoRenderer.node = null;
     }
+    scene.env.sky.notifyCameraCut();
     eventBus.dispatchEvent('scene_changed');
   } else if (!(scene.mainCamera.controller instanceof EditorCameraController)) {
     scene.mainCamera.controller = new EditorCameraController();
@@ -1234,6 +1235,8 @@ function applyCameraWorldLookAt(
   } else {
     camera.lookAt(localEye, localTarget, localUp);
   }
+  // A screenshot may follow at once: the clouds must not still be catching up with the jump
+  camera.scene?.env.sky.notifyCameraCut();
   eventBus.dispatchEvent('scene_changed');
 }
 
