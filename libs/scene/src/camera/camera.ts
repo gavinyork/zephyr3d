@@ -303,6 +303,7 @@ export class Camera extends SceneNode {
   protected _autoExposureBias: number;
   protected _autoExposureSpeedUp: number;
   protected _autoExposureSpeedDown: number;
+  protected _autoExposureStrength: number;
   /** @internal Lighting mode currently reflected by the post effect ordering. */
   protected _postProcessingLightingMode: Nullable<LightingMode>;
   /** @internal Motion blur enable flag (via post effect). */
@@ -544,6 +545,7 @@ export class Camera extends SceneNode {
     this._autoExposureBias = 0;
     this._autoExposureSpeedUp = 3;
     this._autoExposureSpeedDown = 1;
+    this._autoExposureStrength = 1;
     this._postProcessingLightingMode = null;
     this._motionBlur = false;
     this._postEffectMotionBlur = new DRef();
@@ -1093,6 +1095,17 @@ export class Camera extends SceneNode {
   }
   set autoExposureSpeedDown(val: number) {
     this._autoExposureSpeedDown = Math.max(0, val);
+  }
+  /**
+   * Share of the way to middle grey auto exposure goes, 0 to 1. At 1 every view comes out middle
+   * grey; lower adapts only part of the way, as eyes do, so dark rooms and nights stay darker than
+   * daylight by how far they are from the camera's own exposure. Default 1
+   */
+  get autoExposureStrength() {
+    return this._autoExposureStrength;
+  }
+  set autoExposureStrength(val: number) {
+    this._autoExposureStrength = Math.max(0, Math.min(1, val));
   }
   /** Makes auto exposure settle on the next frame at once instead of adapting, after a cut. */
   resetAutoExposure() {
@@ -2226,6 +2239,7 @@ export class Camera extends SceneNode {
     tonemap.autoExposureBias = this._autoExposureBias;
     tonemap.autoExposureSpeedUp = this._autoExposureSpeedUp;
     tonemap.autoExposureSpeedDown = this._autoExposureSpeedDown;
+    tonemap.autoExposureStrength = this._autoExposureStrength;
     // The chain order no longer depends on the lighting mode: Bloom always precedes Tonemap, so it
     // always works on scene-linear radiance. Only the SSGI histories still care about the switch.
     if (this._postProcessingLightingMode !== scene.lightingMode) {

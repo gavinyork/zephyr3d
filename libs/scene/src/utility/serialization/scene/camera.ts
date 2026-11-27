@@ -449,6 +449,24 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'AutoExposureStrength',
+          description:
+            "How far auto exposure goes towards middle grey: 1 brings every view to it, lower adapts only part of the way, as eyes do, so dark rooms and nights stay darker than daylight by how far they are from the camera's own exposure. Set the camera's own exposure for daylight and lower this to keep a night looking like night",
+          type: 'float',
+          phase: 0,
+          default: 1,
+          options: { label: 'Strength', group: 'PostProcessing/ToneMap', minValue: 0, maxValue: 1 },
+          get(this: Camera, value) {
+            value.num[0] = this.autoExposureStrength;
+          },
+          set(this: Camera, value) {
+            this.autoExposureStrength = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return !this.autoExposure;
+          }
+        },
+        {
           name: 'AutoExposureSpeedUp',
           description:
             'How fast auto exposure adapts when the view gets brighter; at 3 it covers 95% of the change in a second',

@@ -47,6 +47,7 @@ export class Tonemap extends AbstractPostEffect {
   private _autoExposureBias: number;
   private _autoExposureSpeedUp: number;
   private _autoExposureSpeedDown: number;
+  private _autoExposureStrength: number;
   /** Adapted exposure of the last frame, carried over to the next */
   private _adaptHistory: Nullable<Texture2D>;
   /** Adapted exposure of this frame, between the auto exposure pass and the tonemap pass */
@@ -71,6 +72,7 @@ export class Tonemap extends AbstractPostEffect {
     this._autoExposureBias = 0;
     this._autoExposureSpeedUp = 3;
     this._autoExposureSpeedDown = 1;
+    this._autoExposureStrength = 1;
     this._adaptHistory = null;
     this._adaptCurrent = null;
     this._adaptReset = true;
@@ -144,6 +146,19 @@ export class Tonemap extends AbstractPostEffect {
   }
   set autoExposureSpeedDown(val: number) {
     this._autoExposureSpeedDown = Math.max(0, val);
+  }
+  /**
+   * Share of the adjustment to middle grey auto exposure makes, 0 to 1. At 1 every view is brought
+   * to middle grey; lower adapts only part of the way, as eyes do, so a dark room or a night stays
+   * darker than daylight and a bright view brighter, by how far they are from the camera's own
+   * exposure. Applied before {@link Tonemap.autoExposureMinEV} and
+   * {@link Tonemap.autoExposureMaxEV}. Default 1
+   */
+  get autoExposureStrength() {
+    return this._autoExposureStrength;
+  }
+  set autoExposureStrength(val: number) {
+    this._autoExposureStrength = Math.max(0, Math.min(1, val));
   }
   /**
    * Makes auto exposure settle on the next frame's scene at once instead of adapting to it, for a
@@ -316,7 +331,7 @@ export class Tonemap extends AbstractPostEffect {
       1 - Math.exp(-dt * this._autoExposureSpeedUp),
       1 - Math.exp(-dt * this._autoExposureSpeedDown),
       this._adaptReset ? 1 : 0,
-      0
+      this._autoExposureStrength
     );
     const bgAdapt = Tonemap._bindgroupAdapt!;
     bgAdapt.setTexture('avgTex', src, fetchSampler('clamp_nearest_nomip'));
@@ -426,7 +441,8 @@ export class Tonemap extends AbstractPostEffect {
       fragment(pb) {
         // x: log2 of middle grey, y: min EV, z: max EV, w: bias
         this.params = pb.vec4().uniform(0);
-        // x: blend towards a brighter scene, y: towards a darker scene, z: 1 to settle at once
+        // x: blend towards a brighter scene, y: towards a darker scene, z: 1 to settle at once,
+        // w: share of the way to middle grey to go
         this.params2 = pb.vec4().uniform(0);
         this.avgTex = pb.tex2D().uniform(0);
         this.historyTex = pb.tex2D().uniform(0);
@@ -435,7 +451,11 @@ export class Tonemap extends AbstractPostEffect {
           this.$l.avg = pb.textureLoad(this.avgTex, pb.ivec2(0, 0), 0);
           this.$l.logLum = pb.div(this.avg.x, pb.max(this.avg.y, 1e-6));
           this.$l.targetEV = pb.add(
-            pb.clamp(pb.sub(this.params.x, this.logLum), this.params.y, this.params.z),
+            pb.clamp(
+              pb.mul(pb.sub(this.params.x, this.logLum), this.params2.w),
+              this.params.y,
+              this.params.z
+            ),
             this.params.w
           );
           this.$l.previous = pb.textureLoad(this.historyTex, pb.ivec2(0, 0), 0).x;
