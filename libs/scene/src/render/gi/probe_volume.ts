@@ -85,6 +85,11 @@ const VISIBILITY_RANGE = 2.6;
 /** Frames between relocations of an updated probe. */
 const RELOCATE_EVERY = 8;
 /**
+ * {@link ProbeLevel.lastRelocated} of a probe whose next relocation starts from its grid point
+ * rather than where it is: one entering the window, or around which the field changed or settled.
+ */
+const RELOCATE_FROM_GRID = -1000;
+/**
  * Frames between updates of a probe no surface reads. Such a probe only looks out for something
  * coming within its reach that neither the scene field nor a draw reported.
  */
@@ -382,7 +387,7 @@ export class ProbeVolume {
         tileBase,
         origin: null,
         state: new Uint8Array(count),
-        lastRelocated: new Int32Array(count).fill(-1000),
+        lastRelocated: new Int32Array(count).fill(RELOCATE_FROM_GRID),
         lastSelected: new Int32Array(count).fill(-1),
         cursor: 0,
         near: new Uint8Array(count).fill(1),
@@ -937,7 +942,7 @@ export class ProbeVolume {
           if (!inPrev) {
             const index = wrapIndex(wx, n[0]) + n[0] * (wrapIndex(wy, n[1]) + n[1] * wrapIndex(wz, n[2]));
             level.state[index] = 0;
-            level.lastRelocated[index] = -1000;
+            level.lastRelocated[index] = RELOCATE_FROM_GRID;
             level.near[index] = 1;
             level.classifyAfter[index] = UNSETTLED;
             level.drawn[index] = -UNSETTLED;
@@ -1113,7 +1118,7 @@ export class ProbeVolume {
       for (let i = 0; i < level.count; i++) {
         if (level.classifyAfter[i] === UNSETTLED) {
           level.classifyAfter[i] = this._frame;
-          level.lastRelocated[i] = -1000;
+          level.lastRelocated[i] = RELOCATE_FROM_GRID;
         }
       }
     }
@@ -1145,7 +1150,7 @@ export class ProbeVolume {
             const i = base + wrapIndex(x, n[0]);
             level.near[i] = 1;
             level.classifyAfter[i] = UNSETTLED;
-            level.lastRelocated[i] = -1000;
+            level.lastRelocated[i] = RELOCATE_FROM_GRID;
           }
         }
       }
@@ -1549,8 +1554,9 @@ export class ProbeVolume {
     return buffer;
   }
   /**
-   * Pushes selected probes out of nearby geometry along the SDF gradient,
-   * never through a surface; on first update and every few frames after.
+   * Pushes selected probes out of nearby geometry along the SDF gradient, never through a
+   * surface, and eases those clear of it back toward their grid points; from the grid point on
+   * entering the window, see {@link RELOCATE_FROM_GRID}, from where they are every few frames after.
    * @internal
    */
   private runRelocate(global: NonNullable<SceneSDF['global']>, selected: number) {
@@ -1594,8 +1600,28 @@ export class ProbeVolume {
             this.$l.h = pb.max(pb.mul(this.spacing, 0.05), this[GLOBAL_SDF_LEVELS].at(0).w);
             // Crossing check every quarter voxel: thin walls dip only slightly below their face distance
             this.$l.probeStep = pb.mul(this[GLOBAL_SDF_LEVELS].at(0).w, 0.25);
-            // Always from the grid point, so the result depends on the field alone and never drifts
-            this.$l.pos = this.grid;
+            // From where the probe is, so it keeps to its side of a wall while the field it is placed by,
+            // whose resolution follows the camera, changes under it (Majercik et al. 2021, §5); from
+            // the grid point when it enters the window or the field changed or settled around it
+            this.$l.pos = this.$choice(
+              pb.equal(this.relocate.at(this.slot), 2),
+              this.grid,
+              pb.add(this.grid, this.data.xyz)
+            );
+            // Clear of surfaces, it eases back toward the grid point by at most its clearance beyond
+            // `keep`, which reaches no surface, so none drifts away for good
+            this.$l.clearance = sampleSceneSDF(this, this.pos, levels);
+            this.$l.toGrid = pb.sub(this.grid, this.pos);
+            this.$l.away = pb.length(this.toGrid);
+            this.$if(
+              pb.and(pb.greaterThan(this.clearance, this.keep), pb.greaterThan(this.away, 1e-4)),
+              function () {
+                this.pos = pb.add(
+                  this.pos,
+                  pb.mul(this.toGrid, pb.div(pb.min(pb.sub(this.clearance, this.keep), this.away), this.away))
+                );
+              }
+            );
             this.$for(pb.int('iter'), 0, 3, function () {
               this.$l.d = sampleSceneSDF(this, this.pos, levels);
               this.$if(pb.greaterThanEqual(this.d, this.keep), function () {
@@ -1645,6 +1671,31 @@ export class ProbeVolume {
             // Classification (Majercik et al. 2021, §5): a probe inside geometry is
             // inactive; one out again starts over. Static field only, so dynamic instances turn none off
             this.$l.probeState = this.data.w;
+            // A probe moved to the other side of a surface starts over too, its history holding the
+            // light of the side it left: a coarser field level, the camera having moved off, can push
+            // one placed in a wall's corner out of the other side. Same dip test as the move's
+            this.$if(probeActive(this, this.data), function () {
+              this.$l.prev = pb.add(this.grid, this.data.xyz);
+              this.$l.shift = pb.length(pb.sub(this.pos, this.prev));
+              this.$if(pb.greaterThan(this.shift, this.probeStep), function () {
+                this.$l.dipBelow = pb.sub(
+                  pb.min(sampleGlobalSDF(this, this.prev, levels), sampleGlobalSDF(this, this.pos, levels)),
+                  this.probeStep
+                );
+                this.$l.shiftSamples = pb.int(pb.min(pb.ceil(pb.div(this.shift, this.probeStep)), 64));
+                this.$for(pb.int('j'), 1, this.shiftSamples, function () {
+                  this.$l.sq = pb.mix(
+                    this.prev,
+                    this.pos,
+                    pb.div(pb.float(this.j), pb.float(this.shiftSamples))
+                  );
+                  this.$if(pb.lessThan(sampleGlobalSDF(this, this.sq, levels), this.dipBelow), function () {
+                    this.probeState = pb.float(0);
+                    this.$break();
+                  });
+                });
+              });
+            });
             this.$l.fieldDist = sampleGlobalSDF(this, this.pos, levels);
             this.$if(pb.lessThan(this.fieldDist, 0), function () {
               this.probeState = pb.float(PROBE_STATE_INACTIVE);
@@ -1679,14 +1730,15 @@ export class ProbeVolume {
       });
       this._relocateBindGroup = device.createBindGroup(this._relocateProgram.bindGroupLayouts[0]);
     }
-    // Which selected probes relocate this frame
+    // Which selected probes relocate this frame: 1 from where they are, 2 from their grid point
     const flags = new Uint32Array(new ArrayBuffer(this._budget * 4));
     for (let i = 0; i < selected; i++) {
       const sel = this._selection[i];
       const level = this._levels[(sel >>> SELECT_LEVEL_SHIFT) & 0x7f];
       const index = (sel & SELECT_INDEX_MASK) - level.tileBase;
-      if (this._frame - level.lastRelocated[index] >= RELOCATE_EVERY) {
-        flags[i] = 1;
+      const last = level.lastRelocated[index];
+      if (this._frame - last >= RELOCATE_EVERY) {
+        flags[i] = last <= RELOCATE_FROM_GRID ? 2 : 1;
         level.lastRelocated[index] = this._frame;
       }
     }
