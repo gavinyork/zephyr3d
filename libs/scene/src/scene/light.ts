@@ -908,7 +908,11 @@ export class PointLight extends PunctualLight {
       ? Math.sqrt(Math.max(0, this.luminousIntensity * physicalScale) / PHYSICAL_LIGHT_CUTOFF_LUX) /
         metersPerUnit
       : 32 * Math.sqrt(Math.max(0.0001, this.intensity * physicalScale));
-    const range = this.range <= 0 ? calculatedRange : Math.min(this.range, calculatedRange);
+    // An authored range is the light's reach, as for spot and rect lights; the cutoff only stands
+    // in when there is none. Capping it by the cutoff cut a dim light (an oil lantern) off where
+    // it still lights a night scene: 0.25 lux is full moonlight. Legacy keeps its cap.
+    const range =
+      this.range <= 0 ? calculatedRange : physical ? this.range : Math.min(this.range, calculatedRange);
     const resolvedIntensity = physical
       ? this.luminousIntensity / (metersPerUnit * metersPerUnit)
       : this.intensity;
