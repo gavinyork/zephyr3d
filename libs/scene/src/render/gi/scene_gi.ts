@@ -66,6 +66,7 @@ export class SceneGI {
       levels: 4,
       levelScale: 2,
       raysPerProbe: 128,
+      rayGuiding: true,
       budget: 4096,
       hysteresis: 0.97,
       // Gather bias: (0.2 N + 0.8 V) * 0.75 * cell * 0.8
@@ -178,6 +179,17 @@ export class SceneGI {
       this._probeOptions.raysPerProbe = val;
       this.rebuildProbes();
     }
+  }
+  /**
+   * Whether each probe steers its rays towards the directions its light came from, keeping one ray
+   * on every direction so new light is still found. Less noise where light comes through a small
+   * bright opening, at the same number of rays; applies from 64 rays per probe, at once.
+   */
+  get probeRayGuiding() {
+    return this._probeOptions.rayGuiding;
+  }
+  set probeRayGuiding(val: boolean) {
+    this._probeOptions.rayGuiding = !!val;
   }
   /** Probes updated per frame; applied when the volume is next built. */
   get probeBudget() {

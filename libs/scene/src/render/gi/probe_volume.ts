@@ -119,6 +119,37 @@ const STATE_MAGIC = 0x50494a5a; // 'ZJIP'
 const STATE_VERSION = 5;
 /** Hit distance written by a sky-escaping ray: beyond any trace length, within half float range. */
 const SKY_ESCAPE_DISTANCE = 16384;
+/**
+ * Ray guiding (structured importance sampling, after Lumen's screen probes): each probe keeps an
+ * {@link GUIDE_RES}² equal-area map of the luminance its rays brought in. Every cell gets one ray
+ * per update, so a newly lit direction is always seen; the rays left over split cells into 2x2,
+ * 4x4 or 8x8 sub-cells, one ray each, given greedily where they cut the error most: a cell's
+ * variance is taken as luminance² / rays², which is that of a bright spot much smaller than its
+ * sub-cells (a sunlit patch of floor seen through a doorway), so one cell far brighter than the
+ * rest takes most of them. A cell's rays share its weight, so every cell weighs the same and the
+ * estimate stays that of uniform stratified sampling, without dividing by a pdf.
+ */
+const GUIDE_RES = 8;
+const GUIDE_CELLS = GUIDE_RES * GUIDE_RES;
+/**
+ * Share of the old luminance a cell keeps per update. A small bright spot in a cell shows only in
+ * the updates whose ray finds it, so the map needs some memory to keep ranking that cell high.
+ */
+const GUIDE_HYSTERESIS = 0.8;
+/** Splits of a cell, each into 4: up to 8x8 sub-cells. */
+const GUIDE_MAX_SPLITS = 3;
+/** Most refinement steps an update makes; each takes at least 3 rays. */
+const GUIDE_MAX_STEPS = 96;
+/** Fewest rays per probe the guided layout is used for: one per cell. */
+const GUIDE_MIN_RAYS = GUIDE_CELLS;
+/** Ray code (w of the ray direction map): cell * GUIDE_CODE_CELL + rays of the cell. */
+const GUIDE_CODE_CELL = 128;
+/** Ray code of the uniform layout: weight 1, no cell. */
+const RAY_CODE_UNIFORM = -2;
+/** Ray code of a slot the guided layout leaves unused: weight 0. */
+const RAY_CODE_UNUSED = -1;
+/** Rounds of GUIDE_CELLS rays the guide pass's threads loop over: 1024 rays, the most a probe takes. */
+const MAX_RAY_ROUNDS = 16;
 
 /**
  * Settings of the probe volume, on {@link SceneGI}.
@@ -135,6 +166,13 @@ export interface ProbeVolumeOptions {
   levelScale: number;
   /** Rays traced per probe per update. */
   raysPerProbe: number;
+  /**
+   * Whether rays are steered towards the directions light came from in the last updates, see
+   * {@link GUIDE_RES}. Cuts the noise of places lit through a small bright opening, such as a room
+   * lit by a doorway onto a sunlit court, at the same number of rays. Applies from 64 rays
+   * per probe; read every update.
+   */
+  rayGuiding: boolean;
   /** Probes updated per frame, all levels together. */
   budget: number;
   /** Share of the previous value kept per update, 0 to 1. */
@@ -263,6 +301,14 @@ export class ProbeVolume {
   private readonly _visibilityFormat: 'rg16f' | 'rgba16f';
   private _rayTexture: Nullable<Texture2D>;
   private _rayFramebuffer: Nullable<FrameBuffer>;
+  /** Direction (xyz) and cell code (w) of every ray of an update, by (ray, selection slot); see runGuide. */
+  private _rayDirs: Nullable<Texture2D>;
+  /** Per probe {@link GUIDE_CELLS} floats: the luminance map its rays are steered by. */
+  private _guide: Nullable<GPUDataBuffer>;
+  private _guideProgram: Nullable<GPUProgram>;
+  private _guideBindGroup: Nullable<BindGroup>;
+  /** (guided layout on, jitter u, jitter v, refined cells) of the current update. */
+  private readonly _guideInfo: Vector4;
   private _data: Nullable<GPUDataBuffer>;
   private _selected: Nullable<GPUDataBuffer>;
   private readonly _selection: Uint32Array<ArrayBuffer>;
@@ -362,6 +408,11 @@ export class ProbeVolume {
       : 'rgba16f';
     this._rayTexture = null;
     this._rayFramebuffer = null;
+    this._rayDirs = null;
+    this._guide = null;
+    this._guideProgram = null;
+    this._guideBindGroup = null;
+    this._guideInfo = new Vector4(0, 0, 0, 0);
     this._data = null;
     this._selected = null;
     this._selection = new Uint32Array(new ArrayBuffer(this._budget * 4));
@@ -507,6 +558,7 @@ export class ProbeVolume {
     // After the relocation, which decides which probes start over, and before
     // the blend, which reads the seeds
     RenderGraphExecutor.profileScope('ProbeSeed', () => this.runSeed(selected));
+    RenderGraphExecutor.profileScope('ProbeGuide', () => this.runGuide(selected));
     RenderGraphExecutor.profileScope('ProbeTrace', () => this.runTrace(global, voxels, camera, selected));
     this.runBlend(selected);
     RenderGraphExecutor.profileScope('ProbeCommit', () => this.runCommit(selected));
@@ -648,6 +700,12 @@ export class ProbeVolume {
         m++;
       });
       const r = (v: number) => Math.round(v * 1000) / 1000;
+      // Irradiance towards each axis (+x, -x, +y, -y, +z, -z), filtered as surfaces sample it
+      const irradianceAxes = AXIS_DIRECTIONS.map((dir) =>
+        sampleTileBilinear(IRRADIANCE_TEXELS, this._irradiance!.width, irr, this._tileCols, tile, dir).map(
+          (v) => Math.round(v * 1e5) / 1e5
+        )
+      );
       return {
         world,
         position: [world[0] * s + d[0], world[1] * s + d[1], world[2] * s + d[2]].map(r),
@@ -655,6 +713,7 @@ export class ProbeVolume {
         updated: d[3] > 0.5,
         inactive: d[3] > PROBE_STATE_INACTIVE - 0.5,
         irradiance: irrSum.slice(0, 3).map((v) => r(v / n)),
+        irradianceAxes,
         sky: r(irrSum[3] / n),
         hitMin: r(visMin),
         hitMean: r(visSum / m)
@@ -721,7 +780,8 @@ export class ProbeVolume {
       this._irradianceSeed,
       this._visibility,
       this._visibilityNext,
-      this._rayTexture
+      this._rayTexture,
+      this._rayDirs
     ]) {
       tex?.dispose();
     }
@@ -731,13 +791,15 @@ export class ProbeVolume {
       this._visibility =
       this._visibilityNext =
       this._rayTexture =
+      this._rayDirs =
         null;
     this._rayFramebuffer?.dispose();
     this._rayFramebuffer = null;
     this._data?.dispose();
     this._selected?.dispose();
     this._hits?.dispose();
-    this._data = this._selected = this._hits = null;
+    this._guide?.dispose();
+    this._data = this._selected = this._hits = this._guide = null;
     this._hitsPending = false;
     this._listenedSDF?.off('dirty', this.onFieldDirty, this);
     this._listenedSDF = null;
@@ -748,6 +810,7 @@ export class ProbeVolume {
     for (const bg of [
       this._relocateBindGroup,
       this._seedBindGroup,
+      this._guideBindGroup,
       this._traceBindGroup,
       this._blendIrrBindGroup,
       this._blendVisBindGroup,
@@ -758,6 +821,7 @@ export class ProbeVolume {
     for (const prog of [
       this._relocateProgram,
       this._seedProgram,
+      this._guideProgram,
       this._traceProgram,
       this._blendIrrProgram,
       this._blendVisProgram,
@@ -768,6 +832,7 @@ export class ProbeVolume {
     this._relocateBindGroup = this._traceBindGroup = this._blendIrrBindGroup = this._blendVisBindGroup = null;
     this._relocateProgram = this._traceProgram = this._blendIrrProgram = this._blendVisProgram = null;
     this._seedProgram = this._seedBindGroup = null;
+    this._guideProgram = this._guideBindGroup = null;
     this._commitProgram = this._commitBindGroup = null;
     for (const level of this._levels) {
       level.origin = null;
@@ -817,6 +882,13 @@ export class ProbeVolume {
     this._rayTexture = device.createTexture2D('rgba16f', this._rays, this._budget, { mipmapping: false })!;
     this._rayTexture.name = '@ProbeRays';
     this._rayFramebuffer = device.createFrameBuffer([this._rayTexture], null)!;
+    this._rayDirs = device.createTexture2D('rgba32f', this._rays, this._budget, {
+      mipmapping: false,
+      writable: true
+    })!;
+    this._rayDirs.name = '@ProbeRayDirections';
+    this._guide = device.createBuffer(this._count * GUIDE_CELLS * 4, { usage: 'uniform', storage: true })!;
+    this._guide.bufferSubData(0, new Float32Array(new ArrayBuffer(this._count * GUIDE_CELLS * 4)));
     this._data = device.createBuffer(this._count * 16, { usage: 'uniform', storage: true })!;
     this._data.bufferSubData(0, new Float32Array(new ArrayBuffer(this._count * 16)));
     this._selected = device.createBuffer(this._budget * 4, { usage: 'uniform', storage: true })!;
@@ -1233,6 +1305,213 @@ export class ProbeVolume {
     const b = Math.sqrt(u1);
     this._rotation.setXYZW(a * Math.sin(u2), a * Math.cos(u2), b * Math.sin(u3), b * Math.cos(u3));
   }
+  /**
+   * Lays out this update's rays, see {@link GUIDE_RES}: one workgroup per selected probe, one
+   * thread per cell of its luminance map. The rays past one per cell are handed out a split at a
+   * time to the cell whose luminance² / rays² is largest (a parallel max per step). Writes each
+   * ray's direction and code to the ray direction map, which the trace and the blend read; without
+   * guiding (off, or fewer rays than cells) the rotated spherical Fibonacci set of before, code
+   * {@link RAY_CODE_UNIFORM}. A probe starting over has no map yet and spreads its splits evenly.
+   * @internal
+   */
+  private runGuide(selected: number) {
+    const device = getDevice();
+    const guided = this._options.rayGuiding && this._rays >= GUIDE_MIN_RAYS;
+    const steps = guided ? Math.min(GUIDE_MAX_STEPS, Math.floor((this._rays - GUIDE_CELLS) / 3)) : 0;
+    // The same sub-cell jitter for every probe of the update, as the rotation is shared
+    this._guideInfo.setXYZW(guided ? 1 : 0, this._prng.get(), this._prng.get(), steps);
+    if (!this._guideProgram) {
+      this._guideProgram = buildSDFProgram({
+        label: 'ProbeGuide',
+        workgroupSize: [GUIDE_CELLS, 1, 1],
+        compute(pb) {
+          this[PROBE_DATA] = pb.vec4[0]().storageBufferReadonly(0);
+          this.selected = pb.uint[0]().storageBufferReadonly(0);
+          this.guide = pb.float[0]().storageBufferReadonly(0);
+          this.rotation = pb.vec4().uniform(0);
+          // (rays per probe, probes selected, frame, hysteresis)
+          this.rayInfo = pb.vec4().uniform(0);
+          // (guided layout on, jitter u, jitter v, refinement steps)
+          this.guideInfo = pb.vec4().uniform(0);
+          this.rayDirs = pb.texStorage2D.rgba32float().storage(0);
+          this.cellLum = pb.float[GUIDE_CELLS]().workgroup();
+          // Splits of each cell: 4^splits rays
+          this.cellSplits = pb.int[GUIDE_CELLS]().workgroup();
+          // First extra slot of each cell's rays past its own, counted from GUIDE_CELLS
+          this.cellExtra = pb.int[GUIDE_CELLS]().workgroup();
+          this.maxScore = pb.float[GUIDE_CELLS]().workgroup();
+          this.maxCell = pb.int[GUIDE_CELLS]().workgroup();
+          // (rays left to hand out, extra rays handed out)
+          this.pool = pb.int[2]().workgroup();
+          pb.main(function () {
+            this.$l.slot = this.$builtins.workGroupId.x;
+            this.$l.cell = pb.int(this.$builtins.localInvocationId.x);
+            this.$l.rayCount = pb.int(this.rayInfo.x);
+            this.$if(pb.equal(this.guideInfo.x, 0), function () {
+              // Uniform layout, each thread every GUIDE_CELLS-th ray
+              this.$for(pb.int('i'), 0, MAX_RAY_ROUNDS, function () {
+                this.$l.r = pb.add(this.cell, pb.mul(this.i, GUIDE_CELLS));
+                this.$if(pb.greaterThanEqual(this.r, this.rayCount), function () {
+                  this.$break();
+                });
+                pb.textureStore(
+                  this.rayDirs,
+                  pb.uvec2(pb.uint(this.r), this.slot),
+                  pb.vec4(
+                    quatRotate(
+                      this,
+                      this.rotation,
+                      sphericalFibonacci(this, pb.float(this.r), this.rayInfo.x)
+                    ),
+                    RAY_CODE_UNIFORM
+                  )
+                );
+              });
+              this.$return();
+            });
+            this.$l.sel = this.selected.at(this.slot);
+            this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(SELECT_INDEX_MASK)));
+            this.$l.fresh = pb.or(
+              pb.greaterThan(pb.compAnd(this.sel, pb.uint(SELECT_FIRST_BIT)), pb.uint(0)),
+              pb.lessThan(this[PROBE_DATA].at(this.index).w, 0.5)
+            );
+            // A probe starting over ranks every cell the same; a floor keeps a dark map's ties by cell
+            this.cellLum.setAt(
+              this.cell,
+              this.$choice(
+                this.fresh,
+                pb.float(1),
+                pb.max(this.guide.at(pb.add(pb.mul(this.index, GUIDE_CELLS), this.cell)), 1e-6)
+              )
+            );
+            this.cellSplits.setAt(this.cell, 0);
+            this.$if(pb.equal(this.cell, 0), function () {
+              this.pool.setAt(0, pb.sub(this.rayCount, GUIDE_CELLS));
+            });
+            pb.workgroupBarrier();
+            this.$for(pb.int('splitStep'), 0, GUIDE_MAX_STEPS, function () {
+              this.$if(pb.greaterThanEqual(this.splitStep, pb.int(this.guideInfo.w)), function () {
+                this.$break();
+              });
+              // Error cut by splitting this cell once more, per ray it takes
+              this.$l.splits = this.cellSplits.at(this.cell);
+              this.$l.rays = pb.sal(pb.int(1), pb.uint(pb.mul(this.splits, 2)));
+              this.$l.lum = this.cellLum.at(this.cell);
+              this.maxScore.setAt(
+                this.cell,
+                this.$choice(
+                  pb.and(
+                    pb.lessThan(this.splits, GUIDE_MAX_SPLITS),
+                    pb.lessThanEqual(pb.mul(this.rays, 3), this.pool.at(0))
+                  ),
+                  pb.div(pb.mul(this.lum, this.lum), pb.float(pb.mul(this.rays, this.rays))),
+                  pb.float(-1)
+                )
+              );
+              this.maxCell.setAt(this.cell, this.cell);
+              pb.workgroupBarrier();
+              for (let half = GUIDE_CELLS >> 1; half >= 1; half >>= 1) {
+                this.$if(pb.lessThan(this.cell, half), function () {
+                  this.$l.otherCell = pb.add(this.cell, half);
+                  this.$if(
+                    pb.greaterThan(this.maxScore.at(this.otherCell), this.maxScore.at(this.cell)),
+                    function () {
+                      this.maxScore.setAt(this.cell, this.maxScore.at(this.otherCell));
+                      this.maxCell.setAt(this.cell, this.maxCell.at(this.otherCell));
+                    }
+                  );
+                });
+                pb.workgroupBarrier();
+              }
+              this.$if(pb.and(pb.equal(this.cell, 0), pb.greaterThan(this.maxScore.at(0), 0)), function () {
+                this.$l.best = this.maxCell.at(0);
+                this.$l.bestSplits = this.cellSplits.at(this.best);
+                this.pool.setAt(
+                  0,
+                  pb.sub(this.pool.at(0), pb.mul(pb.sal(pb.int(1), pb.uint(pb.mul(this.bestSplits, 2))), 3))
+                );
+                this.cellSplits.setAt(this.best, pb.add(this.bestSplits, 1));
+              });
+              pb.workgroupBarrier();
+            });
+            // Extra slots by cell, in cell order
+            this.$if(pb.equal(this.cell, 0), function () {
+              this.$l.acc = pb.int(0);
+              this.$for(pb.int('c'), 0, GUIDE_CELLS, function () {
+                this.cellExtra.setAt(this.c, this.acc);
+                this.acc = pb.add(
+                  this.acc,
+                  pb.sub(pb.sal(pb.int(1), pb.uint(pb.mul(this.cellSplits.at(this.c), 2))), 1)
+                );
+              });
+              this.pool.setAt(1, this.acc);
+            });
+            pb.workgroupBarrier();
+            this.$l.ownSplits = this.cellSplits.at(this.cell);
+            this.$l.side = pb.sal(pb.int(1), pb.uint(this.ownSplits));
+            this.$l.ownRays = pb.mul(this.side, this.side);
+            this.$l.code = pb.float(pb.add(pb.mul(this.cell, GUIDE_CODE_CELL), this.ownRays));
+            this.$l.cellXY = pb.vec2(
+              pb.float(pb.mod(this.cell, GUIDE_RES)),
+              pb.float(pb.div(this.cell, GUIDE_RES))
+            );
+            this.$l.jitter = this.guideInfo.yz;
+            this.$for(pb.int('k'), 0, GUIDE_CELLS, function () {
+              this.$if(pb.greaterThanEqual(this.k, this.ownRays), function () {
+                this.$break();
+              });
+              // The cell's own slot first, then its extra slots
+              this.$l.ray = this.$choice(
+                pb.equal(this.k, 0),
+                this.cell,
+                pb.add(GUIDE_CELLS - 1, this.cellExtra.at(this.cell), this.k)
+              );
+              this.$l.subCell = pb.add(
+                pb.mul(this.cellXY, pb.float(this.side)),
+                pb.vec2(pb.float(pb.mod(this.k, this.side)), pb.float(pb.div(this.k, this.side)))
+              );
+              pb.textureStore(
+                this.rayDirs,
+                pb.uvec2(pb.uint(this.ray), this.slot),
+                pb.vec4(
+                  equalAreaDirection(
+                    this,
+                    pb.div(pb.add(this.subCell, this.jitter), pb.mul(pb.float(this.side), GUIDE_RES))
+                  ),
+                  this.code
+                )
+              );
+            });
+            // Slots past the handed out rays stay unused
+            this.$l.firstUnused = pb.add(GUIDE_CELLS, this.pool.at(1), this.cell);
+            this.$for(pb.int('i'), 0, MAX_RAY_ROUNDS, function () {
+              this.$l.u = pb.add(this.firstUnused, pb.mul(this.i, GUIDE_CELLS));
+              this.$if(pb.greaterThanEqual(this.u, this.rayCount), function () {
+                this.$break();
+              });
+              pb.textureStore(
+                this.rayDirs,
+                pb.uvec2(pb.uint(this.u), this.slot),
+                pb.vec4(0, 0, 1, RAY_CODE_UNUSED)
+              );
+            });
+          });
+        }
+      })!;
+      this._guideBindGroup = device.createBindGroup(this._guideProgram.bindGroupLayouts[0]);
+    }
+    const bg = this._guideBindGroup!;
+    bg.setBuffer(PROBE_DATA, this._data!);
+    bg.setBuffer('selected', this._selected!);
+    bg.setBuffer('guide', this._guide!);
+    bg.setValue('rotation', this._rotation);
+    bg.setValue('rayInfo', new Vector4(this._rays, this._budget, this._frame, this._options.hysteresis));
+    bg.setValue('guideInfo', this._guideInfo);
+    bg.setTexture('rayDirs', this._rayDirs!);
+    device.setProgram(this._guideProgram);
+    device.setBindGroup(0, bg);
+    device.compute(selected, 1, 1);
+  }
   /** @internal */
   private updateParams() {
     const o = this._options;
@@ -1629,6 +1908,8 @@ export class ProbeVolume {
           this.rayInfo = pb.vec4().uniform(0);
           // (environment strength, 0, 0, 0)
           this.skyInfo = pb.vec4().uniform(0);
+          // Laid out by runGuide
+          this.rayDirs = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           if (skyMode !== 'none') {
             envLight.initShaderBindings(pb);
           }
@@ -1642,11 +1923,7 @@ export class ProbeVolume {
             this.$l.world = probeWorldFromTexel(this, this.level, this.texel);
             this.$l.data = this[PROBE_DATA].at(this.index);
             this.$l.pos = probePosition(this, this.level, this.world, this.data);
-            this.$l.dir = quatRotate(
-              this,
-              this.rotation,
-              sphericalFibonacci(this, pb.float(this.fc.x), this.rayInfo.x)
-            );
+            this.$l.dir = pb.normalize(pb.textureLoad(this.rayDirs, this.fc, 0).xyz);
             // Coarser levels look proportionally farther
             this.$l.spacing = probeLevelOrigin(this, this.level).w;
             this.$l.maxDist = pb.mul(
@@ -1794,6 +2071,7 @@ export class ProbeVolume {
     bg.setTexture(VOXEL_SCENE_ANISO0, voxels.radianceAniso0, fetchSampler('clamp_nearest_nomip'));
     bg.setTexture(VOXEL_SCENE_ANISO1, voxels.radianceAniso1, fetchSampler('clamp_nearest_nomip'));
     bg.setValue('skyInfo', new Vector4(envStrength, 0, 0, 0));
+    bg.setTexture('rayDirs', this._rayDirs!, fetchSampler('clamp_nearest_nomip'));
     if (skyMode !== 'none') {
       envLight.updateBindGroup(bg);
     }
@@ -1850,7 +2128,10 @@ export class ProbeVolume {
       if (seed) {
         bg.setTexture('seedTex', seed, fetchSampler('clamp_nearest_nomip'));
         bg.setBuffer('hits', this._hits!);
+        bg.setBuffer('guide', this._guide!);
+        bg.setValue('guideInfo', this._guideInfo);
       }
+      bg.setTexture('rayDirs', this._rayDirs!, fetchSampler('clamp_nearest_nomip'));
       bg.setBuffer(PROBE_DATA, this._data!);
       bg.setValue(PROBE_PARAMS, this._params);
       bg.setBuffer('selected', this._selected!);
@@ -1941,12 +2222,17 @@ export class ProbeVolume {
         this.rotation = pb.vec4().uniform(0);
         this.rayInfo = pb.vec4().uniform(0);
         this.rays = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        // Direction and cell code of each ray, laid out by runGuide
+        this.rayDirs = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.current = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         if (!visibility) {
           // Seeds of the probes starting over, by selection slot (runSeed)
           this.seedTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           // (nearest ray hit, distance to the field) per probe, see ProbeVolume.classify
           this.hits = pb.vec2[0]().storageBuffer(0);
+          // The luminance maps rays are steered by, and (guided layout on, ...) of runGuide
+          this.guide = pb.float[0]().storageBuffer(0);
+          this.guideInfo = pb.vec4().uniform(0);
         }
         this.next =
           visibility && twoChannel
@@ -1998,12 +2284,13 @@ export class ProbeVolume {
           this.$l.sum = pb.vec4(0);
           this.$l.wsum = pb.float(0);
           this.$l.maxDist = pb.mul(probeLevelOrigin(this, this.level).w, VISIBILITY_RANGE);
-          // One ray, `ray` its traced result and `c` the cosine to the texel's direction
+          // One ray, `ray` its traced result, `c` the cosine to the texel's direction and `wk` its
+          // weight in the layout (a sub-cell ray counts a quarter, an unused slot nothing)
           const accumulate = (scope: PBInsideFunctionScope) => {
             if (visibility) {
               // Sharpened (cos^50); below cos 0.8 the weight is under 2e-5, so skip
               scope.$if(pb.greaterThan(scope.c, 0.8), function (this: PBInsideFunctionScope) {
-                this.$l.w = pb.pow(this.c, 50);
+                this.$l.w = pb.mul(pb.pow(this.c, 50), this.wk);
                 this.$l.hd = pb.abs(this.ray.a);
                 this.$if(pb.lessThan(this.ray.a, 0), function () {
                   this.hd = pb.mul(this.hd, 0.2);
@@ -2016,8 +2303,9 @@ export class ProbeVolume {
               // Cosine-weighted sky escape share in alpha: sky visibility, as DDGI [Majercik19]
               scope.$if(pb.greaterThanEqual(scope.ray.a, 0), function (this: PBInsideFunctionScope) {
                 this.$l.escaped = pb.float(pb.greaterThanEqual(this.ray.a, SKY_ESCAPE_DISTANCE * 0.5));
-                this.sum = pb.add(this.sum, pb.mul(pb.vec4(this.ray.rgb, this.escaped), this.c));
-                this.wsum = pb.add(this.wsum, this.c);
+                this.$l.cw = pb.mul(this.c, this.wk);
+                this.sum = pb.add(this.sum, pb.mul(pb.vec4(this.ray.rgb, this.escaped), this.cw));
+                this.wsum = pb.add(this.wsum, this.cw);
               });
             }
           };
@@ -2027,6 +2315,9 @@ export class ProbeVolume {
           if (!visibility) {
             // Every thread reads every ray, so each finds the same nearest hit
             this.$l.nearestHit = pb.float(PROBE_FAR);
+            // The workgroup's 8x8 threads double as the cells of the probe's luminance map: each
+            // sums the luminance of its cell's rays, weighted, which averages them
+            this.$l.cellLum = pb.float(0);
           }
           for (let b = 0; b < rays; b += BLEND_BATCH) {
             const count = Math.min(BLEND_BATCH, rays - b);
@@ -2038,21 +2329,43 @@ export class ProbeVolume {
               });
               this.$l.r = pb.add(this.j, b);
               this.batchRay.setAt(this.j, pb.textureLoad(this.rays, pb.ivec2(this.r, pb.int(this.slot)), 0));
-              this.batchDir.setAt(
-                this.j,
-                pb.vec4(
-                  quatRotate(this, this.rotation, sphericalFibonacci(this, pb.float(this.r), pb.float(rays))),
-                  0
-                )
-              );
+              this.$l.rayDir = pb.textureLoad(this.rayDirs, pb.ivec2(this.r, pb.int(this.slot)), 0);
+              this.batchDir.setAt(this.j, pb.vec4(pb.normalize(this.rayDir.xyz), this.rayDir.w));
             });
             pb.workgroupBarrier();
             this.$for(pb.int('k'), 0, count, function () {
               this.$l.ray = this.batchRay.at(this.k);
-              this.$l.c = pb.max(pb.dot(this.dir, this.batchDir.at(this.k).xyz), 0);
+              this.$l.rd = this.batchDir.at(this.k);
+              this.$l.c = pb.max(pb.dot(this.dir, this.rd.xyz), 0);
+              // Code: cell * GUIDE_CODE_CELL + rays of the cell, each weighing their share of it
+              this.$l.rayCell = pb.floor(pb.div(this.rd.w, GUIDE_CODE_CELL));
+              this.$l.cellRays = pb.sub(this.rd.w, pb.mul(this.rayCell, GUIDE_CODE_CELL));
+              this.$l.wk = this.$choice(
+                pb.lessThan(this.rd.w, RAY_CODE_UNIFORM + 0.5),
+                pb.float(1),
+                this.$choice(
+                  pb.lessThan(this.rd.w, RAY_CODE_UNUSED + 0.5),
+                  pb.float(0),
+                  pb.div(1, pb.max(this.cellRays, 1))
+                )
+              );
               accumulate(this);
               if (!visibility) {
-                this.nearestHit = pb.min(this.nearestHit, pb.abs(this.ray.a));
+                this.$if(pb.greaterThan(this.wk, 0), function () {
+                  this.nearestHit = pb.min(this.nearestHit, pb.abs(this.ray.a));
+                });
+                this.$if(
+                  pb.and(pb.greaterThanEqual(this.rd.w, 0), pb.equal(pb.int(this.rayCell), this.thread)),
+                  function () {
+                    // A ray inside geometry brings nothing in
+                    this.$l.rayLum = this.$choice(
+                      pb.greaterThanEqual(this.ray.a, 0),
+                      pb.dot(this.ray.rgb, pb.vec3(0.2126, 0.7152, 0.0722)),
+                      pb.float(0)
+                    );
+                    this.cellLum = pb.add(this.cellLum, pb.mul(this.rayLum, this.wk));
+                  }
+                );
               }
             });
             // The next batch overwrites the one still being read
@@ -2101,6 +2414,18 @@ export class ProbeVolume {
             visibility ? pb.vec4(this.value.xyz, 1) : this.value
           );
           if (!visibility) {
+            // The luminance map for the next update's layout; a probe starting over takes this one's
+            this.$if(pb.notEqual(this.guideInfo.x, 0), function () {
+              this.$l.guideIndex = pb.add(pb.mul(this.index, GUIDE_CELLS), this.thread);
+              this.guide.setAt(
+                this.guideIndex,
+                this.$choice(
+                  this.first,
+                  this.cellLum,
+                  pb.mix(this.cellLum, this.guide.at(this.guideIndex), GUIDE_HYSTERESIS)
+                )
+              );
+            });
             // Mark the probe updated; an inactive one stays inactive
             this.$if(pb.equal(this.$builtins.localInvocationId.xy, pb.uvec2(0)), function () {
               this.$l.data = this[PROBE_DATA].at(this.index);
@@ -2142,6 +2467,96 @@ export class ProbeVolume {
 /** Slot of a world probe index in a toroidal window of `m` probes along an axis. */
 function wrapIndex(v: number, m: number) {
   return ((v % m) + m) % m;
+}
+
+/**
+ * Unit direction of a point of the unit square under Clarberg's equal-area octahedral map (UE's
+ * EquiAreaSphericalMapping): equal areas of the square cover equal solid angles.
+ */
+function equalAreaDirection(scope: PBInsideFunctionScope, uv: PBShaderExp) {
+  const pb = scope.$builder;
+  const funcName = 'Z_equalAreaDirection';
+  pb.func(funcName, [pb.vec2('uv')], function () {
+    this.$l.sq = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
+    this.$l.asq = pb.abs(this.sq);
+    this.$l.dd = pb.sub(1, pb.add(this.asq.x, this.asq.y));
+    this.$l.rr = pb.sub(1, pb.abs(this.dd));
+    this.$l.phi = this.$choice(
+      pb.lessThanEqual(this.rr, 0),
+      pb.float(0),
+      pb.mul(pb.add(pb.div(pb.sub(this.asq.y, this.asq.x), pb.max(this.rr, 1e-6)), 1), Math.PI / 4)
+    );
+    this.$l.ff = pb.mul(this.rr, pb.sqrt(pb.max(pb.sub(2, pb.mul(this.rr, this.rr)), 0)));
+    this.$l.sx = this.$choice(pb.greaterThanEqual(this.sq.x, 0), pb.float(1), pb.float(-1));
+    this.$l.sy = this.$choice(pb.greaterThanEqual(this.sq.y, 0), pb.float(1), pb.float(-1));
+    this.$l.sz = this.$choice(pb.greaterThanEqual(this.dd, 0), pb.float(1), pb.float(-1));
+    this.$return(
+      pb.normalize(
+        pb.vec3(
+          pb.mul(this.ff, this.sx, pb.abs(pb.cos(this.phi))),
+          pb.mul(this.ff, this.sy, pb.abs(pb.sin(this.phi))),
+          pb.mul(this.sz, pb.sub(1, pb.mul(this.rr, this.rr)))
+        )
+      )
+    );
+  });
+  return scope[funcName](uv) as PBShaderExp;
+}
+
+/** The six axis directions {@link ProbeVolume.queryProbes} reads irradiance towards. */
+const AXIS_DIRECTIONS = [
+  [1, 0, 0],
+  [-1, 0, 0],
+  [0, 1, 0],
+  [0, -1, 0],
+  [0, 0, 1],
+  [0, 0, -1]
+];
+
+/**
+ * CPU copy of sampleProbeTile: the bilinear rgb of a direction in a read back tile of half floats
+ * (4 channels), `cols` tiles a row.
+ */
+function sampleTileBilinear(
+  texels: number,
+  width: number,
+  raw: Uint16Array,
+  cols: number,
+  tile: number,
+  dir: number[]
+) {
+  const l1 = Math.max(Math.abs(dir[0]) + Math.abs(dir[1]) + Math.abs(dir[2]), 1e-6);
+  let px = dir[0] / l1;
+  let py = dir[1] / l1;
+  if (dir[2] < 0) {
+    const sx = px >= 0 ? 1 : -1;
+    const sy = py >= 0 ? 1 : -1;
+    [px, py] = [(1 - Math.abs(py)) * sx, (1 - Math.abs(px)) * sy];
+  }
+  // Texel space of the tile, centres at i + 0.5
+  const fx = 1 + (px * 0.5 + 0.5) * (texels - 2) - 0.5;
+  const fy = 1 + (py * 0.5 + 0.5) * (texels - 2) - 0.5;
+  const x0 = Math.floor(fx);
+  const y0 = Math.floor(fy);
+  const tx = fx - x0;
+  const ty = fy - y0;
+  const ox = (tile % cols) * texels;
+  const oy = Math.floor(tile / cols) * texels;
+  const out = [0, 0, 0];
+  for (const [dx, dy, w] of [
+    [0, 0, (1 - tx) * (1 - ty)],
+    [1, 0, tx * (1 - ty)],
+    [0, 1, (1 - tx) * ty],
+    [1, 1, tx * ty]
+  ]) {
+    const x = Math.min(Math.max(x0 + dx, 0), texels - 1);
+    const y = Math.min(Math.max(y0 + dy, 0), texels - 1);
+    const o = ((oy + y) * width + ox + x) * 4;
+    for (let c = 0; c < 3; c++) {
+      out[c] += half2float(raw[o + c]) * w;
+    }
+  }
+  return out;
 }
 
 /** First texel of a selection slot's tile in a blend output, {@link STAGING_COLS} tiles a row. */

@@ -254,6 +254,23 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'GIProbeRayGuiding',
+          description:
+            "Steers each probe's rays towards the directions its light came from, while still sending one ray every way so new light is found. Steadier bounced light where it comes through a small bright opening, such as a room lit by a doorway, at the same GPU time. Applies from 64 rays per probe up.",
+          type: 'bool',
+          default: true,
+          options: { group: 'Global Illumination' },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.bool[0] = this.gi.probeRayGuiding;
+          },
+          set(this: Scene, value) {
+            this.gi.probeRayGuiding = value.bool[0];
+          }
+        },
+        {
           name: 'GIProbeHysteresis',
           description:
             'How long bounced light holds on to what it showed before. Higher keeps it steadier in a still view but slower to follow a light or camera change; lower follows sooner with more flicker.',
