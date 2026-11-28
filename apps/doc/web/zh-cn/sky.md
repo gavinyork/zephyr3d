@@ -72,7 +72,7 @@ directionalLight.sunLight = false;
 
 ### 云层
 
-大气散射天空支持两种云层，通过 `cloudMode` 切换：默认的、通过 ray marching 绘制的 `volumetric` 体积云，以及开销更低的 `procedural` 2D 云层。两者都只在 `skyType = 'scatter'` 时绘制，天空盒模式不显示云层。体积云成为默认之前保存、未记录云类型的场景，加载后仍是 2D 云层。
+大气散射天空支持两种云层，通过 `cloudMode` 切换：默认的、通过 ray marching 绘制的 `volumetric` 体积云，以及开销更低的 `procedural` 2D 云层。两者都只在 `skyType = 'scatter'` 时绘制，天空盒模式不显示云层。
 
 上面示例左上角的按钮可以在两种云层之间切换。切换只需改 `cloudMode`，再用 `effectiveCloudMode` 读回实际生效的模式（WebGL2 设备不能渲染到半精度浮点纹理时，体积云会退回 2D 云层，示例因此禁用了体积云按钮）：
 
