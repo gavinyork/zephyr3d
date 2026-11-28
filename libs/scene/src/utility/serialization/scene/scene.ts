@@ -1059,13 +1059,14 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'CloudMode',
-          description:
-            'Procedural draws a flat cloud layer; Volumetric draws lit 3D clouds (WebGPU only, falls back to Procedural elsewhere)',
+          description: 'Procedural draws a flat cloud layer; Volumetric draws lit 3D clouds',
           type: 'string',
           phase: 1,
           options: {
             enum: { labels: ['Procedural', 'Volumetric'], values: ['procedural', 'volumetric'] }
           },
+          // Not the runtime default (volumetric): scenes saved while procedural was the default
+          // left it out, and a missing value loads as this one
           default: 'procedural',
           get(this: Scene, value) {
             value.str[0] = this.env.sky.cloudMode;

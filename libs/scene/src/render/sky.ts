@@ -307,7 +307,7 @@ export class SkyRenderer extends Disposable {
     this._heightFogParams = getDefaultHeightFogParams();
     this._cloudy = 0.45;
     this._cloudIntensity = 15;
-    this._cloudMode = 'procedural';
+    this._cloudMode = 'volumetric';
     this._volumetricCloud = new VolumetricCloud();
     this._volumetricCloudResources = new VolumetricCloudResources();
     this._volumetricCloudCache = new VolumetricCloudSkyCache();
@@ -741,11 +741,12 @@ export class SkyRenderer extends Disposable {
     }
   }
   /**
-   * How the clouds of the scatter sky are drawn.
+   * How the clouds of the scatter sky are drawn. Default `volumetric`.
    *
    * @remarks
-   * `volumetric` needs a WebGPU device; on other devices the procedural clouds are drawn instead,
-   * see {@link SkyRenderer.effectiveCloudMode}.
+   * `volumetric` needs half float render targets on WebGL2 (`EXT_color_buffer_half_float` or
+   * `EXT_color_buffer_float`); without them the procedural clouds are drawn instead, see
+   * {@link SkyRenderer.effectiveCloudMode}.
    */
   get cloudMode(): CloudMode {
     return this._cloudMode;
@@ -756,16 +757,26 @@ export class SkyRenderer extends Disposable {
       this.invalidate();
     }
   }
-  /** The cloud mode actually drawn: `volumetric` falls back to `procedural` off WebGPU. */
+  /**
+   * The cloud mode actually drawn: `volumetric` falls back to `procedural` on a WebGL2 device
+   * that cannot render to half float textures.
+   */
   get effectiveCloudMode(): CloudMode {
-    if (this._cloudMode === 'volumetric' && getDevice().type !== 'webgpu') {
+    if (this._cloudMode === 'volumetric' && !SkyRenderer._volumetricSupported()) {
       if (!SkyRenderer._volumetricFallbackWarned) {
         SkyRenderer._volumetricFallbackWarned = true;
-        console.warn('Volumetric clouds require WebGPU, drawing procedural clouds instead');
+        console.warn(
+          'Volumetric clouds need half float render targets, which this device lacks, drawing procedural clouds instead'
+        );
       }
       return 'procedural';
     }
     return this._cloudMode;
+  }
+  /** Whether the device can draw volumetric clouds: their caches are half float. */
+  private static _volumetricSupported() {
+    const device = getDevice();
+    return device.type === 'webgpu' || device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer;
   }
   /** Parameters of the volumetric clouds. */
   get volumetricCloud(): VolumetricCloud {

@@ -185,6 +185,8 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
   private initPreview(material: MeshMaterial) {
     const scene = new Scene();
     scene.env.light.type = 'ibl';
+    // A preview needs no volumetric clouds of its own
+    scene.env.sky.cloudMode = 'procedural';
     const camera = new PerspectiveCamera(scene);
     camera.fovY = Math.PI / 3;
     camera.lookAt(new Vector3(0, 5, 10), Vector3.zero(), Vector3.axisPY());

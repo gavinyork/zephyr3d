@@ -23,6 +23,8 @@ import type { Texture2D } from '@zephyr3d/device';
 export function bareScene(scene: Scene) {
   scene.env.sky.skyType = 'none';
   scene.env.sky.fogType = 'none';
+  // The 2D clouds the scatter sky scenes were captured with; cloud scenes opt in to volumetric
+  scene.env.sky.cloudMode = 'procedural';
   scene.env.light.type = 'none';
 }
 

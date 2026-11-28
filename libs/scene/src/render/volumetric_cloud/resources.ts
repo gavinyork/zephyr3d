@@ -11,6 +11,7 @@ import type {
 import { getDevice } from '../../app/api';
 import { fetchSampler } from '../../utility/misc';
 import { cloudPerlinFbm, cloudPerlinWorley, cloudWorleyFbm, cloudWorleyNoise } from './cloud_noise';
+import { buildTexelProgram, cloudPassesUseCompute, drawTexelPass } from './texel_pass';
 
 /** Edge of the base shape volume, [Schneider15]: 128^3 Perlin-Worley + Worley fbm. */
 export const CLOUD_BASE_NOISE_SIZE = 128;
@@ -80,39 +81,36 @@ function getVolumeProgram(kind: VolumeKind) {
   if (cached) {
     return cached;
   }
-  const program = getDevice().buildComputeProgram({
+  const program = buildTexelProgram({
     label: kind === 'base' ? 'CloudBaseNoise' : 'CloudDetailNoise',
     workgroupSize: [4, 4, 4],
-    compute(pb) {
-      this.dst = pb.texStorage3D.rgba8unorm().storage(0);
+    storage: (pb) => pb.texStorage3D.rgba8unorm().storage(0),
+    layered: true,
+    declare(pb) {
       // (size, freq, 0, 0)
       this.params = pb.vec4().uniform(0);
       this.seed = pb.vec3().uniform(0);
-      pb.main(function () {
-        this.$l.size = pb.uint(this.params.x);
-        this.$if(pb.all(pb.lessThan(this.$builtins.globalInvocationId, pb.uvec3(this.size))), function () {
-          this.$l.p = pb.div(pb.add(pb.vec3(this.$builtins.globalInvocationId), pb.vec3(0.5)), this.params.x);
-          this.$l.freq = this.params.y;
-          this.$l.w0 = cloudWorleyFbm(this, this.p, this.freq, this.seed);
-          this.$l.w1 = cloudWorleyFbm(this, this.p, pb.mul(this.freq, 2), this.seed);
-          this.$l.w2 = cloudWorleyFbm(this, this.p, pb.mul(this.freq, 4), this.seed);
-          if (kind === 'base') {
-            // R: Perlin-Worley (4 octaves, 4..32 cells), GBA: Worley fbm of increasing frequency
-            this.$l.r = cloudPerlinWorley(this, this.p, this.freq, this.w0, this.seed, 4);
-            this.$l.value = pb.vec4(this.r, this.w0, this.w1, this.w2);
-          } else {
-            // RGB: Worley fbm of increasing frequency
-            this.$l.value = pb.vec4(this.w0, this.w1, this.w2, 1);
-          }
-          pb.textureStore(
-            this.dst,
-            this.$builtins.globalInvocationId,
-            pb.clamp(this.value, pb.vec4(0), pb.vec4(1))
-          );
-        });
+    },
+    main(pb, id, emit) {
+      this.$l.size = pb.uint(this.params.x);
+      this.$if(pb.all(pb.lessThan(id, pb.uvec3(this.size))), function () {
+        this.$l.p = pb.div(pb.add(pb.vec3(id), pb.vec3(0.5)), this.params.x);
+        this.$l.freq = this.params.y;
+        this.$l.w0 = cloudWorleyFbm(this, this.p, this.freq, this.seed);
+        this.$l.w1 = cloudWorleyFbm(this, this.p, pb.mul(this.freq, 2), this.seed);
+        this.$l.w2 = cloudWorleyFbm(this, this.p, pb.mul(this.freq, 4), this.seed);
+        if (kind === 'base') {
+          // R: Perlin-Worley (4 octaves, 4..32 cells), GBA: Worley fbm of increasing frequency
+          this.$l.r = cloudPerlinWorley(this, this.p, this.freq, this.w0, this.seed, 4);
+          this.$l.value = pb.vec4(this.r, this.w0, this.w1, this.w2);
+        } else {
+          // RGB: Worley fbm of increasing frequency
+          this.$l.value = pb.vec4(this.w0, this.w1, this.w2, 1);
+        }
+        emit(this, id, pb.clamp(this.value, pb.vec4(0), pb.vec4(1)));
       });
     }
-  })!;
+  });
   if (kind === 'base') {
     baseProgram = program;
   } else {
@@ -123,102 +121,96 @@ function getVolumeProgram(kind: VolumeKind) {
 
 function getWeatherProgram() {
   if (!weatherProgram) {
-    weatherProgram = getDevice().buildComputeProgram({
+    weatherProgram = buildTexelProgram({
       label: 'CloudWeatherMap',
       workgroupSize: [8, 8, 1],
-      compute(pb) {
-        this.dst = pb.texStorage2D.rgba8unorm().storage(0);
+      storage: (pb) => pb.texStorage2D.rgba8unorm().storage(0),
+      declare(pb) {
         // (size, footprint freq, type freq, modulation freq)
         this.params = pb.vec4().uniform(0);
         this.seed = pb.vec3().uniform(0);
-        pb.main(function () {
-          this.$l.size = pb.uint(this.params.x);
-          this.$if(
-            pb.all(pb.lessThan(this.$builtins.globalInvocationId.xy, pb.uvec2(this.size))),
-            function () {
-              // A z = 0 slice of the periodic volume noise tiles in x and y
-              this.$l.p = pb.vec3(
-                pb.div(pb.add(pb.vec2(this.$builtins.globalInvocationId.xy), pb.vec2(0.5)), this.params.x),
-                0
-              );
-              this.$l.modulation = pb.clamp(
-                pb.add(pb.mul(cloudPerlinFbm(this, this.p, this.params.w, 4, this.seed), 0.5), 0.5),
-                0,
-                1
-              );
-              this.$l.connectedRaw = pb.mul(
-                pb.clamp(
-                  pb.add(pb.mul(cloudPerlinFbm(this, this.p, this.params.y, 4, this.seed), 0.5), 0.5),
-                  0,
-                  1
-                ),
-                this.modulation
-              );
-              // One dome per Worley cell: saturate(1 - d^2 / 0.7) x modulation
-              this.$l.isolated = pb.mul(
-                pb.clamp(
-                  pb.add(
-                    pb.mul(
-                      pb.sub(
-                        cloudWorleyNoise(
-                          this,
-                          pb.mul(this.p, WEATHER_ISOLATED_FREQ),
-                          pb.float(WEATHER_ISOLATED_FREQ),
-                          this.seed
-                        ),
-                        1
-                      ),
-                      1 / 0.7
+      },
+      main(pb, id, emit) {
+        this.$l.size = pb.uint(this.params.x);
+        this.$if(pb.all(pb.lessThan(id.xy, pb.uvec2(this.size))), function () {
+          // A z = 0 slice of the periodic volume noise tiles in x and y
+          this.$l.p = pb.vec3(pb.div(pb.add(pb.vec2(id.xy), pb.vec2(0.5)), this.params.x), 0);
+          this.$l.modulation = pb.clamp(
+            pb.add(pb.mul(cloudPerlinFbm(this, this.p, this.params.w, 4, this.seed), 0.5), 0.5),
+            0,
+            1
+          );
+          this.$l.connectedRaw = pb.mul(
+            pb.clamp(
+              pb.add(pb.mul(cloudPerlinFbm(this, this.p, this.params.y, 4, this.seed), 0.5), 0.5),
+              0,
+              1
+            ),
+            this.modulation
+          );
+          // One dome per Worley cell: saturate(1 - d^2 / 0.7) x modulation
+          this.$l.isolated = pb.mul(
+            pb.clamp(
+              pb.add(
+                pb.mul(
+                  pb.sub(
+                    cloudWorleyNoise(
+                      this,
+                      pb.mul(this.p, WEATHER_ISOLATED_FREQ),
+                      pb.float(WEATHER_ISOLATED_FREQ),
+                      this.seed
                     ),
                     1
                   ),
-                  0,
-                  1
+                  1 / 0.7
                 ),
-                pb.smoothStep(0.15, 0.65, this.modulation)
-              );
-              this.$l.connected = empiricalCDF(this, this.connectedRaw, WEATHER_CONNECTED_QUANTILES);
-              // fbm + 0.5 spans 0 (stratus) to 1 (cumulus)
-              this.$l.cloudType = pb.add(cloudPerlinFbm(this, this.p, this.params.z, 4, this.seed), 0.5);
-              pb.textureStore(
-                this.dst,
-                this.$builtins.globalInvocationId.xy,
-                pb.clamp(pb.vec4(this.connected, this.isolated, this.cloudType, 1), pb.vec4(0), pb.vec4(1))
-              );
-            }
+                1
+              ),
+              0,
+              1
+            ),
+            pb.smoothStep(0.15, 0.65, this.modulation)
+          );
+          this.$l.connected = empiricalCDF(this, this.connectedRaw, WEATHER_CONNECTED_QUANTILES);
+          // fbm + 0.5 spans 0 (stratus) to 1 (cumulus)
+          this.$l.cloudType = pb.add(cloudPerlinFbm(this, this.p, this.params.z, 4, this.seed), 0.5);
+          emit(
+            this,
+            id.xy,
+            pb.clamp(pb.vec4(this.connected, this.isolated, this.cloudType, 1), pb.vec4(0), pb.vec4(1))
           );
         });
       }
-    })!;
+    });
   }
   return weatherProgram;
 }
 
 function getAtlasProgram() {
   if (!atlasProgram) {
-    atlasProgram = getDevice().buildComputeProgram({
+    atlasProgram = buildTexelProgram({
       label: 'CloudVolumeFromAtlas',
       workgroupSize: [4, 4, 4],
-      compute(pb) {
+      storage: (pb) => pb.texStorage3D.rgba8unorm().storage(0),
+      layered: true,
+      declare(pb) {
         this.src = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.dst = pb.texStorage3D.rgba8unorm().storage(0);
         // (slice edge, slices per atlas row, 0, 0)
         this.params = pb.vec4().uniform(0);
-        pb.main(function () {
-          this.$l.edge = pb.uint(this.params.x);
-          this.$l.cols = pb.uint(this.params.y);
-          this.$l.id = this.$builtins.globalInvocationId;
-          this.$if(pb.all(pb.lessThan(this.id, pb.uvec3(this.edge))), function () {
-            // Slice z sits in atlas column z % cols, row z / cols, rows running down
-            this.$l.texel = pb.add(
-              pb.mul(pb.uvec2(pb.mod(this.id.z, this.cols), pb.div(this.id.z, this.cols)), this.edge),
-              this.id.xy
-            );
-            pb.textureStore(this.dst, this.id, pb.textureLoad(this.src, pb.ivec2(this.texel), 0));
-          });
+      },
+      main(pb, id, emit) {
+        this.$l.edge = pb.uint(this.params.x);
+        this.$l.cols = pb.uint(this.params.y);
+        this.$if(pb.all(pb.lessThan(id, pb.uvec3(this.edge))), function () {
+          // Slice z sits in atlas column z % cols, row z / cols, rows running down
+          this.$l.texel = pb.add(
+            pb.mul(pb.uvec2(pb.mod(id.z, this.cols), pb.div(id.z, this.cols)), this.edge),
+            id.xy
+          );
+          emit(this, id, pb.textureLoad(this.src, pb.ivec2(this.texel), 0));
         });
       }
-    })!;
+    });
   }
   return atlasProgram;
 }
@@ -374,7 +366,8 @@ export class VolumetricCloudResources extends Disposable {
     let tex = target.get();
     if (!tex || tex.width !== edge) {
       tex = getDevice().createTexture3D('rgba8unorm', edge, edge, edge, {
-        writable: true,
+        // Rendered to a layer at a time where there are no storage textures
+        writable: cloudPassesUseCompute(),
         samplerOptions: {
           addressU: 'repeat',
           addressV: 'repeat',
@@ -389,12 +382,15 @@ export class VolumetricCloudResources extends Disposable {
     tex.name = name;
     return tex;
   }
-  private _dispatch(
+  /**
+   * Fills every texel of `target` with a program of {@link buildTexelProgram}, then builds the
+   * mip chain: one dispatch on the compute path, one draw per layer on the fragment path.
+   */
+  private _run(
     program: GPUProgram,
-    setup: (bindGroup: BindGroup) => void,
-    x: number,
-    y: number,
-    z: number
+    target: Texture2D | Texture3D,
+    workgroupEdge: number,
+    setup: (bindGroup: BindGroup) => void
   ) {
     const device = getDevice();
     let bindGroup = this._bindGroups.get(program);
@@ -403,42 +399,47 @@ export class VolumetricCloudResources extends Disposable {
       this._bindGroups.set(program, bindGroup);
     }
     setup(bindGroup);
-    device.setProgram(program);
-    device.setBindGroup(0, bindGroup);
-    device.compute(x, y, z);
+    const layers = target.isTexture3D() ? target.depth : 1;
+    if (cloudPassesUseCompute()) {
+      bindGroup.setTextureView('dst', target, 0, 0, 1);
+      device.setProgram(program);
+      device.setBindGroup(0, bindGroup);
+      device.compute(
+        Math.ceil(target.width / workgroupEdge),
+        Math.ceil(target.height / workgroupEdge),
+        Math.ceil(layers / (layers > 1 ? workgroupEdge : 1))
+      );
+    } else {
+      const fb = device.createFrameBuffer([target], null);
+      // Once after the last layer rather than at every layer switch
+      fb.setColorAttachmentGenerateMipmaps(0, false);
+      device.pushDeviceStates();
+      for (let z = 0; z < layers; z++) {
+        if (layers > 1) {
+          fb.setColorAttachmentLayer(0, z);
+          bindGroup.setValue('zLayer', z);
+        }
+        drawTexelPass(program, bindGroup, fb);
+      }
+      device.popDeviceStates();
+      fb.dispose();
+    }
+    target.generateMipmaps();
   }
   private _generateVolume(kind: VolumeKind, target: DRef<Texture3D>, seed: number) {
     const edge = kind === 'base' ? CLOUD_BASE_NOISE_SIZE : CLOUD_DETAIL_NOISE_SIZE;
     const tex = this._ensureVolume(target, edge, kind === 'base' ? 'CloudBaseNoise' : 'CloudDetailNoise');
-    const groups = Math.ceil(edge / 4);
-    this._dispatch(
-      getVolumeProgram(kind),
-      (bindGroup) => {
-        bindGroup.setTextureView('dst', tex, 0, 0, 1);
-        bindGroup.setValue('params', new Vector4(edge, kind === 'base' ? BASE_FREQ : DETAIL_FREQ, 0, 0));
-        bindGroup.setValue('seed', seedOffset(seed));
-      },
-      groups,
-      groups,
-      groups
-    );
-    tex.generateMipmaps();
+    this._run(getVolumeProgram(kind), tex, 4, (bindGroup) => {
+      bindGroup.setValue('params', new Vector4(edge, kind === 'base' ? BASE_FREQ : DETAIL_FREQ, 0, 0));
+      bindGroup.setValue('seed', seedOffset(seed));
+    });
   }
   private _fromAtlas(target: DRef<Texture3D>, source: Texture2D, edge: number, cols: number, name: string) {
     const tex = this._ensureVolume(target, edge, name);
-    const groups = Math.ceil(edge / 4);
-    this._dispatch(
-      getAtlasProgram(),
-      (bindGroup) => {
-        bindGroup.setTexture('src', source, fetchSampler('clamp_nearest_nomip'));
-        bindGroup.setTextureView('dst', tex, 0, 0, 1);
-        bindGroup.setValue('params', new Vector4(edge, cols, 0, 0));
-      },
-      groups,
-      groups,
-      groups
-    );
-    tex.generateMipmaps();
+    this._run(getAtlasProgram(), tex, 4, (bindGroup) => {
+      bindGroup.setTexture('src', source, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setValue('params', new Vector4(edge, cols, 0, 0));
+    });
   }
   private _generateWeatherMap(seed: number) {
     let tex = this._weatherMap.get();
@@ -449,26 +450,17 @@ export class VolumetricCloudResources extends Disposable {
       this._weatherMap.set(tex);
     }
     tex.name = 'CloudWeatherMap';
-    const groups = Math.ceil(CLOUD_WEATHER_MAP_SIZE / 8);
-    this._dispatch(
-      getWeatherProgram(),
-      (bindGroup) => {
-        bindGroup.setTextureView('dst', tex, 0, 0, 1);
-        bindGroup.setValue(
-          'params',
-          new Vector4(
-            CLOUD_WEATHER_MAP_SIZE,
-            WEATHER_FOOTPRINT_FREQ,
-            WEATHER_TYPE_FREQ,
-            WEATHER_MODULATION_FREQ
-          )
-        );
-        bindGroup.setValue('seed', seedOffset(seed));
-      },
-      groups,
-      groups,
-      1
-    );
-    tex.generateMipmaps();
+    this._run(getWeatherProgram(), tex, 8, (bindGroup) => {
+      bindGroup.setValue(
+        'params',
+        new Vector4(
+          CLOUD_WEATHER_MAP_SIZE,
+          WEATHER_FOOTPRINT_FREQ,
+          WEATHER_TYPE_FREQ,
+          WEATHER_MODULATION_FREQ
+        )
+      );
+      bindGroup.setValue('seed', seedOffset(seed));
+    });
   }
 }

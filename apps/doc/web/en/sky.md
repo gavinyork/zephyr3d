@@ -71,9 +71,9 @@ directional light created in a scene automatically becomes the sun**, so orienti
 
 ### Clouds
 
-The atmospheric sky supports two kinds of clouds, selected with `cloudMode`: the default `procedural` 2D clouds, and WebGPU ray-marched `volumetric` clouds. Both are drawn only when `skyType = 'scatter'`; the skybox mode shows no clouds.
+The atmospheric sky supports two kinds of clouds, selected with `cloudMode`: the default ray-marched `volumetric` clouds, and cheaper `procedural` 2D clouds. Both are drawn only when `skyType = 'scatter'`; the skybox mode shows no clouds. Scenes saved before volumetric clouds became the default, which did not store a cloud mode, still load with 2D clouds.
 
-The buttons in the top-left corner of the example above switch between the two. Switching only takes a `cloudMode` change; read `effectiveCloudMode` back to get the mode actually drawn (off WebGPU, volumetric falls back to 2D clouds, which is why the example disables the volumetric button there):
+The buttons in the top-left corner of the example above switch between the two. Switching only takes a `cloudMode` change; read `effectiveCloudMode` back to get the mode actually drawn (a WebGL2 device that cannot render to half float textures falls back to 2D clouds, which is why the example disables the volumetric button there):
 
 <<< @/../src/tut-34/main.js{59-80 js}
 
@@ -121,7 +121,7 @@ The engine generates weather, base-noise, and detail-noise resources by default.
 
 Use `sky.cloudDebugView = 'weather'` (or `baseNoise`, `detailNoise`, `densityXY`, and related views) to inspect the generated resources.
 
-Volumetric mode is WebGPU-only. Other backends fall back to `effectiveCloudMode === 'procedural'` and show the 2D clouds above. Volumetric clouds are not scene geometry and do not participate in Mesh LOD, SDF, or physics.
+Volumetric mode runs on WebGPU and WebGL2. On WebGL2 it needs half float render targets (`EXT_color_buffer_half_float` or `EXT_color_buffer_float`, available on practically every desktop GPU); without them `effectiveCloudMode` reports `'procedural'` and the 2D clouds above are drawn. Volumetric clouds are not scene geometry and do not participate in Mesh LOD, SDF, or physics.
 
 **Volumetric clouds are only drawn from below the layer.** When the observer is higher than `layerBottomAltitude` minus 500 m, the engine draws the 2D clouds instead and warns once in the console; `effectiveCloudMode` still reports `'volumetric'`, since it only reflects backend support. Keep this in mind for flight or high-altitude shots.
 
@@ -139,4 +139,4 @@ sunLight.cloudShadowStrength = 1;
 
 The shadow is traced into a cloud shadow map centred on the camera, reaching twice `cloudShadowExtent` atmosphere metres to each side; a smaller extent gives sharper shadows over a smaller area. The same map darkens lit surfaces, the sky and aerial perspective, and the [DDGI](en/lighting-indirect.md#sdf-based-ddgi) voxel lighting, so the bounce light dims under a cloud too. `cloudShadowOnSurfaceStrength` and `cloudShadowOnAtmosphereStrength` (0 to 1) scale the two effects separately, and `cloudShadowMapResolutionScale` and `cloudShadowRaySampleCountScale` trade quality for cost (the default resolution scale of 0.5 keeps the trace affordable on integrated GPUs).
 
-Only the sun light (`DirectionalLight.getSunLight(scene)`) casts cloud shadows, and only in volumetric cloud mode, which is WebGPU-only.
+Only the sun light (`DirectionalLight.getSunLight(scene)`) casts cloud shadows, and only in volumetric cloud mode.

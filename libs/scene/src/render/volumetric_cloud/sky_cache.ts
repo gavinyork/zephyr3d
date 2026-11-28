@@ -1,6 +1,6 @@
 import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
-import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
 import type { AtmosphereParams } from '../../shaders/atmosphere';
 import {
@@ -23,6 +23,12 @@ import {
   getCloudParamsStruct
 } from './cloud_common';
 import type { VolumetricCloudResources } from './resources';
+import {
+  buildFullscreenProgram,
+  buildTexelProgram,
+  cloudPassesUseCompute,
+  drawTexelPass
+} from './texel_pass';
 import type { VolumetricCloud } from './volumetric_cloud';
 
 /*
@@ -46,15 +52,25 @@ const HORIZON_MARGIN = Math.PI / 180;
 
 let traceProgram: Nullable<GPUProgram>[] = [null, null, null];
 let ambientProgram: Nullable<GPUProgram> = null;
+let scatterProgram: Nullable<GPUProgram> = null;
+
+/*
+ * Each frame traces every stride-th texel of the cache in both axes from an offset. A compute
+ * thread stores its texel wherever it lies; a fragment can only write its own, and a full-screen
+ * draw that discards all but one texel in stride x stride would leave the trace loop's threads
+ * idle. The fragment path therefore traces the frame's texels into a compact target of one texel
+ * per stride x stride cell, then scatters it into the cache with a cheap draw.
+ */
 
 function getTraceProgram(msOctaves: number) {
   let program = traceProgram[msOctaves];
   if (!program) {
     const msCount = 1 + msOctaves;
-    program = getDevice().buildComputeProgram({
+    program = buildTexelProgram({
       label: `VolumetricCloudSkyCache${msCount}`,
       workgroupSize: [8, 8, 1],
-      compute(pb) {
+      storage: (pb) => pb.texStorage2D.rgba16float().storage(0),
+      declare(pb) {
         const AtmosphereParams = getAtmosphereParamsStruct(pb);
         const CloudParams = getCloudParamsStruct(pb);
         this.atmo = AtmosphereParams().uniform(0);
@@ -69,50 +85,47 @@ function getTraceProgram(msOctaves: number) {
         this.tLut = pb.tex2D().uniform(0);
         this.msLut = pb.tex2D().uniform(0);
         this.ambientTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.dst = pb.texStorage2D.rgba16float().storage(0);
-        pb.main(function () {
-          // Every stride-th texel in both axes from the offset: each frame traces a sparse grid
-          // over the whole sky, so near-horizon and zenith rays share every frame's work evenly
-          this.$l.texel = pb.add(
-            pb.uvec2(this.block.xy),
-            pb.mul(this.$builtins.globalInvocationId.xy, pb.uint(this.cacheParams.y))
-          );
-          this.$if(
-            pb.or(
-              pb.greaterThanEqual(this.texel.x, pb.uint(this.block.z)),
-              pb.greaterThanEqual(this.texel.y, pb.uint(this.block.z))
-            ),
-            function () {
-              this.$return();
-            }
-          );
-          this.$l.uv = pb.div(pb.add(pb.vec2(this.texel), pb.vec2(0.5)), this.block.z);
-          this.$l.dir = cloudCacheDecode(this, this.uv, this.cacheParams.x);
-          this.$l.ambient = pb.textureLoad(this.ambientTex, pb.ivec2(0), 0).rgb;
-          // Every cache texel is traced once per round, so a fixed screen-space noise phase
-          // survives the map blend as a visible grid. Sample each segment at its midpoint.
-          this.$l.jitter = pb.float(0.5);
-          this.$l.result = cloudTrace(
-            this,
-            msCount,
-            this.atmo,
-            this.cloud,
-            this.dir,
-            this.jitter,
-            this.block.w,
-            this.ambient,
-            {
-              weatherMap: this.weatherMap,
-              baseNoise: this.baseNoise,
-              detailNoise: this.detailNoise,
-              transmittanceLut: this.tLut,
-              multiScatteringLut: this.msLut
-            }
-          );
-          pb.textureStore(this.dst, this.texel, this.result);
-        });
+      },
+      main(pb, id, emit) {
+        // Every stride-th texel in both axes from the offset: each frame traces a sparse grid
+        // over the whole sky, so near-horizon and zenith rays share every frame's work evenly.
+        // On the fragment path `id` is a texel of the compact target.
+        this.$l.texel = pb.add(pb.uvec2(this.block.xy), pb.mul(id.xy, pb.uint(this.cacheParams.y)));
+        this.$if(
+          pb.or(
+            pb.greaterThanEqual(this.texel.x, pb.uint(this.block.z)),
+            pb.greaterThanEqual(this.texel.y, pb.uint(this.block.z))
+          ),
+          function () {
+            this.$return();
+          }
+        );
+        this.$l.uv = pb.div(pb.add(pb.vec2(this.texel), pb.vec2(0.5)), this.block.z);
+        this.$l.dir = cloudCacheDecode(this, this.uv, this.cacheParams.x);
+        this.$l.ambient = pb.textureLoad(this.ambientTex, pb.ivec2(0), 0).rgb;
+        // Every cache texel is traced once per round, so a fixed screen-space noise phase
+        // survives the map blend as a visible grid. Sample each segment at its midpoint.
+        this.$l.jitter = pb.float(0.5);
+        this.$l.result = cloudTrace(
+          this,
+          msCount,
+          this.atmo,
+          this.cloud,
+          this.dir,
+          this.jitter,
+          this.block.w,
+          this.ambient,
+          {
+            weatherMap: this.weatherMap,
+            baseNoise: this.baseNoise,
+            detailNoise: this.detailNoise,
+            transmittanceLut: this.tLut,
+            multiScatteringLut: this.msLut
+          }
+        );
+        emit(this, this.texel, this.result);
       }
-    })!;
+    });
     traceProgram[msOctaves] = program;
   }
   return program;
@@ -120,24 +133,51 @@ function getTraceProgram(msOctaves: number) {
 
 function getAmbientProgram() {
   if (!ambientProgram) {
-    ambientProgram = getDevice().buildComputeProgram({
+    ambientProgram = buildTexelProgram({
       label: 'VolumetricCloudDistantSkyLight',
       workgroupSize: [1, 1, 1],
-      compute(pb) {
+      storage: (pb) => pb.texStorage2D.rgba16float().storage(0),
+      declare(pb) {
         const AtmosphereParams = getAtmosphereParamsStruct(pb);
         this.atmo = AtmosphereParams().uniform(0);
         this.sphereSamples = pb.vec4[64]().uniformBuffer(0);
         this.tLut = pb.tex2D().uniform(0);
         this.msLut = pb.tex2D().uniform(0);
-        this.dst = pb.texStorage2D.rgba16float().storage(0);
-        pb.main(function () {
-          this.$l.light = cloudDistantSkyLight(this, this.atmo, this.sphereSamples, this.tLut, this.msLut);
-          pb.textureStore(this.dst, pb.uvec2(0), pb.vec4(this.light, 1));
-        });
+      },
+      main(pb, _id, emit) {
+        this.$l.light = cloudDistantSkyLight(this, this.atmo, this.sphereSamples, this.tLut, this.msLut);
+        emit(this, pb.uvec2(0), pb.vec4(this.light, 1));
       }
-    })!;
+    });
   }
   return ambientProgram;
+}
+
+/** Fragment path: copies the compact target of a frame to its texels of the cache. */
+function getScatterProgram() {
+  if (!scatterProgram) {
+    scatterProgram = buildFullscreenProgram('VolumetricCloudSkyCacheScatter', function (pb) {
+      this.src = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+      // (texel offset x, y, texel stride, 0)
+      this.scatter = pb.vec4().uniform(0);
+      this.$outputs.color = pb.vec4();
+      pb.main(function () {
+        this.$l.texel = pb.uvec2(this.$builtins.fragCoord.xy);
+        this.$l.stride = pb.uint(this.scatter.z);
+        this.$l.cell = pb.div(this.texel, this.stride);
+        this.$if(
+          pb.any(
+            pb.compNotEqual(pb.sub(this.texel, pb.mul(this.cell, this.stride)), pb.uvec2(this.scatter.xy))
+          ),
+          function () {
+            pb.discard();
+          }
+        );
+        this.$outputs.color = pb.textureLoad(this.src, pb.ivec2(this.cell), 0);
+      });
+    });
+  }
+  return scatterProgram;
 }
 
 /** Inputs of one round, frozen when it starts. */
@@ -249,6 +289,12 @@ export function buildCloudParams(
 export class VolumetricCloudSkyCache extends Disposable {
   private readonly _maps: DRef<Texture2D>[];
   private readonly _ambient: DRef<Texture2D>;
+  /** Fragment path: render targets of the maps and the distant sky light */
+  private readonly _mapFramebuffers: DRef<FrameBuffer>[];
+  private readonly _ambientFramebuffer: DRef<FrameBuffer>;
+  /** Fragment path: the texels of one frame, one per stride x stride cell of the cache */
+  private readonly _compact: DRef<Texture2D>;
+  private readonly _compactFramebuffer: DRef<FrameBuffer>;
   /** Elevation remap each map was traced with */
   private readonly _deltas: number[];
   private _writeIndex: number;
@@ -267,6 +313,10 @@ export class VolumetricCloudSkyCache extends Disposable {
     super();
     this._maps = [new DRef(), new DRef(), new DRef()];
     this._ambient = new DRef();
+    this._mapFramebuffers = [new DRef(), new DRef(), new DRef()];
+    this._ambientFramebuffer = new DRef();
+    this._compact = new DRef();
+    this._compactFramebuffer = new DRef();
     this._deltas = [0, 0, 0];
     this._writeIndex = 0;
     this._fromIndex = 1;
@@ -326,9 +376,7 @@ export class VolumetricCloudSkyCache extends Disposable {
     if (params.cacheResolution !== this._resolution || params.framesPerUpdate !== this._framesPerUpdate) {
       this._resolution = params.cacheResolution;
       this._framesPerUpdate = params.framesPerUpdate;
-      for (const map of this._maps) {
-        map.dispose();
-      }
+      this._disposeMaps();
       this._rebuild = true;
     }
     this._ensureMaps();
@@ -360,34 +408,64 @@ export class VolumetricCloudSkyCache extends Disposable {
   }
   protected onDispose() {
     super.onDispose();
-    for (const map of this._maps) {
-      map.dispose();
-    }
+    this._disposeMaps();
+    this._ambientFramebuffer.dispose();
     this._ambient.dispose();
     for (const bindGroup of this._bindGroups.values()) {
       bindGroup.dispose();
     }
     this._bindGroups.clear();
   }
+  private _disposeMaps() {
+    for (const fb of this._mapFramebuffers) {
+      fb.dispose();
+    }
+    this._compactFramebuffer.dispose();
+    this._compact.dispose();
+    for (const map of this._maps) {
+      map.dispose();
+    }
+  }
   private _ensureMaps() {
     const device = getDevice();
+    const compute = cloudPassesUseCompute();
     for (let i = 0; i < 3; i++) {
       if (!this._maps[i].get()) {
         const tex = device.createTexture2D('rgba16f', this._resolution, this._resolution, {
-          writable: true,
+          writable: compute,
           // A storage binding takes a single level
           mipmapping: false,
           samplerOptions: { addressU: 'clamp', addressV: 'clamp', mipFilter: 'none' }
         })!;
         tex.name = `VolumetricCloudSkyCache${i}`;
         this._maps[i].set(tex);
+        if (!compute) {
+          this._mapFramebuffers[i].set(device.createFrameBuffer([tex], null));
+        }
       }
     }
     if (!this._ambient.get()) {
-      const tex = device.createTexture2D('rgba16f', 1, 1, { writable: true, mipmapping: false })!;
+      const tex = device.createTexture2D('rgba16f', 1, 1, { writable: compute, mipmapping: false })!;
       tex.name = 'VolumetricCloudDistantSkyLight';
       this._ambient.set(tex);
+      if (!compute) {
+        this._ambientFramebuffer.set(device.createFrameBuffer([tex], null));
+      }
     }
+    if (!compute && !this._compactFramebuffer.get()) {
+      const count = Math.ceil(this._resolution / this._stride());
+      const tex = device.createTexture2D('rgba16f', count, count, {
+        mipmapping: false,
+        samplerOptions: { addressU: 'clamp', addressV: 'clamp', mipFilter: 'none' }
+      })!;
+      tex.name = 'VolumetricCloudSkyCacheFrame';
+      this._compact.set(tex);
+      this._compactFramebuffer.set(device.createFrameBuffer([tex], null));
+    }
+  }
+  /** Texels between two traced in one frame, per axis */
+  private _stride() {
+    return Math.round(Math.sqrt(this._framesPerUpdate));
   }
   private _needsRebuild(params: VolumetricCloud, atmosphere: AtmosphereParams) {
     const inputs = this._inputs!;
@@ -448,10 +526,16 @@ export class VolumetricCloudSkyCache extends Disposable {
     bindGroup.setValue('atmo', this._inputs!.atmosphere);
     bindGroup.setTexture('tLut', getTransmittanceLut(), fetchSampler('clamp_linear_nomip'));
     bindGroup.setTexture('msLut', getMultiScatteringLut(), fetchSampler('clamp_linear_nomip'));
-    bindGroup.setTexture('dst', this._ambient.get()!);
-    device.setProgram(program);
-    device.setBindGroup(0, bindGroup);
-    device.compute(1, 1, 1);
+    if (cloudPassesUseCompute()) {
+      bindGroup.setTexture('dst', this._ambient.get()!);
+      device.setProgram(program);
+      device.setBindGroup(0, bindGroup);
+      device.compute(1, 1, 1);
+    } else {
+      device.pushDeviceStates();
+      drawTexelPass(program, bindGroup, this._ambientFramebuffer.get()!);
+      device.popDeviceStates();
+    }
   }
   private _traceBlock(resources: VolumetricCloudResources, index: number, stepScale: number) {
     const inputs = this._inputs!;
@@ -461,7 +545,7 @@ export class VolumetricCloudSkyCache extends Disposable {
     // Interleaved rather than one contiguous block per frame, whose cost would swing with how far
     // that part of the sky's rays cross the layer: frame `index` takes the texel at that offset
     // in every stride x stride cell.
-    const stride = Math.round(Math.sqrt(this._framesPerUpdate));
+    const stride = this._stride();
     const count = Math.ceil(this._resolution / stride);
     const bx = index % stride;
     const by = Math.floor(index / stride);
@@ -476,10 +560,22 @@ export class VolumetricCloudSkyCache extends Disposable {
     bindGroup.setTexture('tLut', getTransmittanceLut(), fetchSampler('clamp_linear_nomip'));
     bindGroup.setTexture('msLut', getMultiScatteringLut(), fetchSampler('clamp_linear_nomip'));
     bindGroup.setTexture('ambientTex', this._ambient.get()!, fetchSampler('clamp_nearest_nomip'));
-    bindGroup.setTexture('dst', this._maps[this._writeIndex].get()!);
-    device.setProgram(program);
-    device.setBindGroup(0, bindGroup);
-    const groups = Math.ceil(count / 8);
-    device.compute(groups, groups, 1);
+    if (cloudPassesUseCompute()) {
+      bindGroup.setTexture('dst', this._maps[this._writeIndex].get()!);
+      device.setProgram(program);
+      device.setBindGroup(0, bindGroup);
+      const groups = Math.ceil(count / 8);
+      device.compute(groups, groups, 1);
+      return;
+    }
+    // Trace into the compact target, then scatter it to its texels of the map
+    const scatter = getScatterProgram();
+    const scatterBindGroup = this._bindGroup(scatter);
+    scatterBindGroup.setTexture('src', this._compact.get()!, fetchSampler('clamp_nearest_nomip'));
+    scatterBindGroup.setValue('scatter', new Vector4(bx, by, stride, 0));
+    device.pushDeviceStates();
+    drawTexelPass(program, bindGroup, this._compactFramebuffer.get()!);
+    drawTexelPass(scatter, scatterBindGroup, this._mapFramebuffers[this._writeIndex].get()!);
+    device.popDeviceStates();
   }
 }
