@@ -269,7 +269,7 @@
     "physics-drop": {
       "accepted": {
         "linux-x64": [
-          "9d8b4ff0f1f9193f86ec1d73bb686d56"
+          "9e63be532bd7f7d68bc55625b8855ce9"
         ],
         "win32-x64": [
           "9e63be532bd7f7d68bc55625b8855ce9"
@@ -280,10 +280,10 @@
     "physics-joints": {
       "accepted": {
         "linux-x64": [
-          "dbedee6955880c83f914a5640aac344e"
+          "893aecca41a82144d12f3fc62bb318f2"
         ],
         "win32-x64": [
-          "893aecca41a82144d12f3fc62bb318f2"
+          "747565277b1f4dffa5ce719cf2aa5f83"
         ]
       },
       "size": 512
@@ -291,7 +291,7 @@
     "physics-mesh-ground": {
       "accepted": {
         "linux-x64": [
-          "30ae3e4d69c52439803f1d710707f8eb"
+          "715d30bf63f84e9769f8f10d2e261faa"
         ],
         "win32-x64": [
           "715d30bf63f84e9769f8f10d2e261faa"
@@ -302,7 +302,7 @@
     "physics-vehicle": {
       "accepted": {
         "linux-x64": [
-          "e53148ef0580b10f99cdd8f09c656f9c"
+          "8b1654cb91a2080e99a6754447d14a3d"
         ],
         "win32-x64": [
           "8b1654cb91a2080e99a6754447d14a3d"
