@@ -11,7 +11,7 @@ import {
   getEngine
 } from '@zephyr3d/scene';
 
-// Volumetric clouds need WebGPU; ?backend=webgl2 or ?backend=webgpu forces a backend.
+// ?backend=webgl2 or ?backend=webgpu forces a backend.
 async function resolveBackend() {
   const forced = new URLSearchParams(location.search).get('backend');
   if (forced === 'webgl2') {
@@ -60,11 +60,6 @@ myApp.ready().then(async () => {
   const btn2D = document.querySelector('#btn-2d');
   /** @type {HTMLButtonElement} */
   const btnVolumetric = document.querySelector('#btn-volumetric');
-  const webgpu = myApp.device.type === 'webgpu';
-  if (!webgpu) {
-    btnVolumetric.disabled = true;
-    btnVolumetric.title = 'Volumetric clouds require WebGPU';
-  }
 
   function setCloudMode(mode) {
     scene.env.sky.cloudMode = mode;
@@ -77,7 +72,12 @@ myApp.ready().then(async () => {
 
   btn2D.addEventListener('click', () => setCloudMode('procedural'));
   btnVolumetric.addEventListener('click', () => setCloudMode('volumetric'));
-  setCloudMode(webgpu ? 'volumetric' : 'procedural');
+  setCloudMode('volumetric');
+  // A WebGL2 device without half float render targets draws 2D clouds instead
+  if (scene.env.sky.effectiveCloudMode !== 'volumetric') {
+    btnVolumetric.disabled = true;
+    btnVolumetric.title = 'Volumetric clouds need half float render targets';
+  }
 
   getEngine().setRenderable(scene, 0);
 

@@ -1060,7 +1060,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         {
           name: 'CloudMode',
           description:
-            'Procedural draws a flat cloud layer; Volumetric draws lit 3D clouds (WebGPU only, falls back to Procedural elsewhere)',
+            'Procedural draws a flat cloud layer; Volumetric draws lit 3D clouds',
           type: 'string',
           phase: 1,
           options: {

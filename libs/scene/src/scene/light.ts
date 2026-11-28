@@ -436,7 +436,8 @@ export class DirectionalLight extends PunctualLight {
     }
   }
   /**
-   * Whether the volumetric clouds shade this light, when it is the sun light. Default false.
+   * Whether the volumetric clouds shade this light, when it is the sun light. WebGPU only.
+   * Default false.
    */
   get castCloudShadows() {
     return this._castCloudShadows;

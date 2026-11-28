@@ -763,7 +763,7 @@ export function getDirectionalLightClass(): SerializableClass {
         {
           name: 'CastCloudShadows',
           description:
-            'If true and this is the sun light, the volumetric clouds cast moving shadows on the scene',
+            'If true and this is the sun light, the volumetric clouds cast moving shadows on the scene (WebGPU only)',
           type: 'bool',
           default: false,
           options: {

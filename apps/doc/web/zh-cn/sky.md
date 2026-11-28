@@ -72,9 +72,9 @@ directionalLight.sunLight = false;
 
 ### 云层
 
-大气散射天空支持两种云层，通过 `cloudMode` 切换：默认的 `procedural` 2D 云层，以及 WebGPU 上通过 ray marching 绘制的 `volumetric` 体积云。两者都只在 `skyType = 'scatter'` 时绘制，天空盒模式不显示云层。
+大气散射天空支持两种云层，通过 `cloudMode` 切换：默认的 `procedural` 2D 云层，以及通过 ray marching 绘制的 `volumetric` 体积云。两者都只在 `skyType = 'scatter'` 时绘制，天空盒模式不显示云层。
 
-上面示例左上角的按钮可以在两种云层之间切换。切换只需改 `cloudMode`，再用 `effectiveCloudMode` 读回实际生效的模式（非 WebGPU 后端上体积云会退回 2D 云层，示例因此禁用了体积云按钮）：
+上面示例左上角的按钮可以在两种云层之间切换。切换只需改 `cloudMode`，再用 `effectiveCloudMode` 读回实际生效的模式（WebGL2 设备不能渲染到半精度浮点纹理时，体积云会退回 2D 云层，示例因此禁用了体积云按钮）：
 
 <<< @/../src/tut-34/main.js{59-80 js}
 
@@ -130,7 +130,7 @@ sky.cloudDebugView = 'weather'; // 也可用 baseNoise、detailNoise、densityXY
 
 **限制**
 
-- `volumetric` 仅 WebGPU。其他后端会通过 `effectiveCloudMode` 自动退回 `procedural`，显示上面介绍的 2D 云层。
+- `volumetric` 支持 WebGPU 与 WebGL2。WebGL2 上需要半精度浮点渲染目标（`EXT_color_buffer_half_float` 或 `EXT_color_buffer_float`，桌面显卡基本都支持）；不支持时 `effectiveCloudMode` 报告 `'procedural'`，显示上面介绍的 2D 云层。
 - **体积云只在云层下方绘制。** 观察者高度高于 `layerBottomAltitude` 减 500 米时，引擎改画 2D 云层，并在控制台警告一次。此时 `effectiveCloudMode` 仍报告 `'volumetric'`（它只反映后端是否支持）。飞行或高空镜头需要考虑这一点。
 - 体积云不是场景几何体，不参与 Mesh LOD、SDF 或物理碰撞。
 - 云层参数是大气中的米。世界坐标到大气米的换算由 `scene.env.sky.cameraHeightScale`（每个世界单位对应的大气米数，默认 1）决定，与 `scene.metersPerUnit` 无关。场景单位不是米时，调整 `cameraHeightScale`，否则相机高度和云层的相对位置会不对。
@@ -147,4 +147,4 @@ sunLight.cloudShadowStrength = 1;
 
 云影被追踪到一张以相机为中心的云阴影图中，向每一侧覆盖两倍 `cloudShadowExtent` 大气米；范围越小，阴影越清晰，覆盖面积也越小。同一张图会压暗受光表面、天空与大气透视，以及 [DDGI](zh-cn/lighting-indirect.md#基于-sdf-的-ddgi) 的体素光照，因此云下的反弹光也会变暗。`cloudShadowOnSurfaceStrength` 和 `cloudShadowOnAtmosphereStrength`（0 到 1）分别调节这两部分效果，`cloudShadowMapResolutionScale` 和 `cloudShadowRaySampleCountScale` 在质量与开销之间取舍（分辨率缩放默认 0.5，让集成显卡也能负担追踪）。
 
-只有太阳光（`DirectionalLight.getSunLight(scene)`）会投射云阴影，且只在体积云模式下生效，该模式仅支持 WebGPU。
+只有太阳光（`DirectionalLight.getSunLight(scene)`）会投射云阴影，且只在体积云模式下生效。云阴影目前仅支持 WebGPU：WebGL2 上会绘制体积云但不投射云影，并在控制台警告一次。

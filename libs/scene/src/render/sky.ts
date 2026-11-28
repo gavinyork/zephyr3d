@@ -233,6 +233,7 @@ export class SkyRenderer extends Disposable {
   private _cloudDebugSlice: number;
   private _cloudDebugChannel: number;
   private static _volumetricFallbackWarned = false;
+  private static _cloudShadowWarned = false;
   private _debugAerialPerspective: number;
   private readonly _wind: Vector2;
   private readonly _skyboxRotation: Vector3;
@@ -744,8 +745,9 @@ export class SkyRenderer extends Disposable {
    * How the clouds of the scatter sky are drawn.
    *
    * @remarks
-   * `volumetric` needs a WebGPU device; on other devices the procedural clouds are drawn instead,
-   * see {@link SkyRenderer.effectiveCloudMode}.
+   * `volumetric` needs half float render targets on WebGL2 (`EXT_color_buffer_half_float` or
+   * `EXT_color_buffer_float`); without them the procedural clouds are drawn instead, see
+   * {@link SkyRenderer.effectiveCloudMode}.
    */
   get cloudMode(): CloudMode {
     return this._cloudMode;
@@ -756,16 +758,30 @@ export class SkyRenderer extends Disposable {
       this.invalidate();
     }
   }
-  /** The cloud mode actually drawn: `volumetric` falls back to `procedural` off WebGPU. */
+  /**
+   * The cloud mode actually drawn: `volumetric` falls back to `procedural` on a WebGL2 device
+   * that cannot render to half float textures.
+   */
   get effectiveCloudMode(): CloudMode {
-    if (this._cloudMode === 'volumetric' && getDevice().type !== 'webgpu') {
+    if (this._cloudMode === 'volumetric' && !SkyRenderer._volumetricSupported()) {
       if (!SkyRenderer._volumetricFallbackWarned) {
         SkyRenderer._volumetricFallbackWarned = true;
-        console.warn('Volumetric clouds require WebGPU, drawing procedural clouds instead');
+        console.warn(
+          'Volumetric clouds need half float render targets, which this device lacks, drawing procedural clouds instead'
+        );
       }
       return 'procedural';
     }
     return this._cloudMode;
+  }
+  /** Whether the device can draw volumetric clouds: their caches are half float. */
+  private static _volumetricSupported() {
+    const device = getDevice();
+    return device.type === 'webgpu' || device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer;
+  }
+  /** Whether the device can trace the volumetric cloud shadow map: WebGPU only for now. */
+  private static _cloudShadowSupported() {
+    return getDevice().type === 'webgpu';
   }
   /** Parameters of the volumetric clouds. */
   get volumetricCloud(): VolumetricCloud {
@@ -1081,6 +1097,7 @@ export class SkyRenderer extends Disposable {
     this._viewLUTsDeferred =
       useScatter &&
       this.effectiveCloudMode === 'volumetric' &&
+      SkyRenderer._cloudShadowSupported() &&
       !!sun?.castCloudShadows &&
       sun.cloudShadowStrength > 0 &&
       sun.cloudShadowOnAtmosphereStrength > 0;
@@ -1287,6 +1304,13 @@ export class SkyRenderer extends Disposable {
       sun.cloudShadowStrength <= 0 ||
       (sun.cloudShadowOnSurfaceStrength <= 0 && sun.cloudShadowOnAtmosphereStrength <= 0)
     ) {
+      return false;
+    }
+    if (!SkyRenderer._cloudShadowSupported()) {
+      if (!SkyRenderer._cloudShadowWarned) {
+        SkyRenderer._cloudShadowWarned = true;
+        console.warn('Volumetric cloud shadows require WebGPU, the sun is drawn without them');
+      }
       return false;
     }
     const ready = this._cloudShadowMap.update(

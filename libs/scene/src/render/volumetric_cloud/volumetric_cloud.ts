@@ -4,8 +4,8 @@ import { Vector2, Vector3 } from '@zephyr3d/base';
  * How the clouds of a scatter sky are drawn.
  *
  * - `procedural`: the infinitely thin 2D cloud layer evaluated in the sky shader.
- * - `volumetric`: ray-marched volumetric clouds lit by the atmosphere (WebGPU only; other
- *   devices fall back to `procedural`).
+ * - `volumetric`: ray-marched volumetric clouds lit by the atmosphere (a WebGL2 device without
+ *   half float render targets falls back to `procedural`).
  *
  * @public
  */
