@@ -59,6 +59,11 @@
       "packageName": "@zephyr3d/scene",
       "comment": "Draw volumetric clouds by default in the scatter sky; scenes saved without a cloud mode still load with 2D clouds.",
       "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Follow a moving sun or camera with the time-sliced volumetric cloud cache and sky lighting updates instead of rebuilding them at once, which a sun swept across the sky did every few frames; SkyRenderer.notifyCameraCut now also rebakes the sky lighting at once.",
+      "type": "patch"
     }
   ],
   "packageName": "@zephyr3d/scene"

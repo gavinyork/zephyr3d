@@ -38,11 +38,12 @@ import type { VolumetricCloud } from './volumetric_cloud';
  * were completed last, by the progress of the one being written. Every input of a round (eye,
  * sun, time, parameters) is frozen when it starts so the blocks of one map agree.
  *
- * A moving camera, however fast, is followed by the rounds alone. A displacement between two frames
- * cannot tell a jump from fast travel such as an orbit around a distant pivot, and a whole rebuild
- * lengthens the next frame and with it the next displacement, so a threshold on it would rebuild
- * every frame while the camera keeps moving. Jumps are reported by the application instead
- * ({@link VolumetricCloudSkyCache.invalidate}).
+ * A moving camera or sun, however fast, is followed by the rounds alone. A change between two
+ * frames cannot tell a jump from fast motion such as an orbit around a distant pivot or a sun
+ * swept across the sky, and a whole rebuild lengthens the next frame and with it the next change,
+ * so a threshold on it would rebuild every frame while the motion lasts; nor can a change since the
+ * round began, which a steady motion passes every few frames. Jumps are reported by the
+ * application instead ({@link VolumetricCloudSkyCache.invalidate}).
  */
 
 /** A rebuild needs enough steps to resolve cloud edges before the regular rounds finish. */
@@ -187,7 +188,6 @@ type RoundInputs = {
   delta: number;
   msOctaves: number;
   version: number;
-  sunDir: Vector3;
 };
 
 function cloneAtmosphere(p: AtmosphereParams): AtmosphereParams {
@@ -380,7 +380,7 @@ export class VolumetricCloudSkyCache extends Disposable {
       this._rebuild = true;
     }
     this._ensureMaps();
-    if (!this._rebuild && this._inputs && this._needsRebuild(params, atmosphere)) {
+    if (!this._rebuild && this._inputs && this._needsRebuild(params)) {
       this._rebuild = true;
     }
     if (this._rebuild) {
@@ -467,13 +467,9 @@ export class VolumetricCloudSkyCache extends Disposable {
   private _stride() {
     return Math.round(Math.sqrt(this._framesPerUpdate));
   }
-  private _needsRebuild(params: VolumetricCloud, atmosphere: AtmosphereParams) {
+  private _needsRebuild(params: VolumetricCloud) {
     const inputs = this._inputs!;
-    if (params.version !== inputs.version || params.msOctaves !== inputs.msOctaves) {
-      return true;
-    }
-    // A sudden sun change would otherwise fade in over two rounds
-    return Vector3.dot(atmosphere.lightDir, inputs.sunDir) < Math.cos((5 * Math.PI) / 180);
+    return params.version !== inputs.version || params.msOctaves !== inputs.msOctaves;
   }
   private _bindGroup(program: GPUProgram) {
     let bindGroup = this._bindGroups.get(program);
@@ -494,8 +490,7 @@ export class VolumetricCloudSkyCache extends Disposable {
       cloud: buildCloudParams(params, atmo, time, atmo.skyViewReferential, eyeHeight),
       delta,
       msOctaves: params.msOctaves,
-      version: params.version,
-      sunDir: new Vector3(atmo.lightDir)
+      version: params.version
     };
     this._deltas[this._writeIndex] = delta;
     this._frame = 0;
