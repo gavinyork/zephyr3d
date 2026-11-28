@@ -1,6 +1,6 @@
 import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
-import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
 import type { AtmosphereParams } from '../../shaders/atmosphere';
 import { fetchSampler } from '../../utility/misc';
@@ -13,6 +13,7 @@ import {
 import type { VolumetricCloudResources } from './resources';
 import { buildCloudParams } from './sky_cache';
 import type { VolumetricCloud } from './volumetric_cloud';
+import { buildTexelProgram, cloudPassesUseCompute, drawTexelPass } from './texel_pass';
 
 /*
  * Volumetric cloud shadow map. An orthographic map seen from the sun stores per texel the depth
@@ -69,10 +70,11 @@ let filterProgram: Nullable<GPUProgram> = null;
 
 function getTraceProgram() {
   if (!traceProgram) {
-    traceProgram = getDevice().buildComputeProgram({
+    traceProgram = buildTexelProgram({
       label: 'VolumetricCloudShadow',
       workgroupSize: [8, 8, 1],
-      compute(pb) {
+      storage: (pb) => pb.texStorage2D.rgba16float().storage(0),
+      declare(pb) {
         const CloudParams = getCloudParamsStruct(pb);
         this.cloud = CloudParams().uniform(0);
         // (near plane origin, half width)
@@ -86,144 +88,137 @@ function getTraceProgram() {
         this.weatherMap = pb.tex2D().uniform(0);
         this.baseNoise = pb.tex3D().uniform(0);
         this.detailNoise = pb.tex3D().uniform(0);
-        this.dst = pb.texStorage2D.rgba16float().storage(0);
-        pb.main(function () {
-          this.$l.res = pb.uint(this.params.w);
-          this.$if(
-            pb.or(
-              pb.greaterThanEqual(this.$builtins.globalInvocationId.x, this.res),
-              pb.greaterThanEqual(this.$builtins.globalInvocationId.y, this.res)
-            ),
-            function () {
-              this.$return();
-            }
-          );
-          this.$l.texel = this.$builtins.globalInvocationId.xy;
-          this.$l.uv = pb.div(pb.add(pb.vec2(this.texel), pb.vec2(0.5)), this.params.w);
-          this.$l.ndc = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
-          // The texel on the near plane
-          this.$l.nearPos = pb.add(
-            this.lightPos.xyz,
-            pb.mul(this.axisX.xyz, pb.mul(this.ndc.x, this.lightPos.w)),
-            pb.mul(this.axisY.xyz, pb.mul(this.ndc.y, this.lightPos.w))
-          );
-          this.$l.dir = this.lightDir.xyz;
-          this.$l.farDepthKm = this.params.z;
-          this.$l.tTop2 = raySphereSolutions(this, this.nearPos, this.dir, this.cloud.layer.y);
-          this.$l.tBottom2 = raySphereSolutions(this, this.nearPos, this.dir, this.cloud.layer.x);
-          this.$if(pb.and(pb.lessThan(this.tTop2.x, 0), pb.lessThan(this.tTop2.y, 0)), function () {
-            // Misses the layer: no shadow
-            pb.textureStore(this.dst, this.texel, pb.vec4(this.farDepthKm, 0, 0, 0));
+      },
+      main(pb, id, emit) {
+        this.$l.res = pb.uint(this.params.w);
+        this.$if(
+          pb.or(pb.greaterThanEqual(id.x, this.res), pb.greaterThanEqual(id.y, this.res)),
+          function () {
+            this.$return();
+          }
+        );
+        this.$l.texel = id.xy;
+        this.$l.uv = pb.div(pb.add(pb.vec2(this.texel), pb.vec2(0.5)), this.params.w);
+        this.$l.ndc = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
+        // The texel on the near plane
+        this.$l.nearPos = pb.add(
+          this.lightPos.xyz,
+          pb.mul(this.axisX.xyz, pb.mul(this.ndc.x, this.lightPos.w)),
+          pb.mul(this.axisY.xyz, pb.mul(this.ndc.y, this.lightPos.w))
+        );
+        this.$l.dir = this.lightDir.xyz;
+        this.$l.farDepthKm = this.params.z;
+        this.$l.tTop2 = raySphereSolutions(this, this.nearPos, this.dir, this.cloud.layer.y);
+        this.$l.tBottom2 = raySphereSolutions(this, this.nearPos, this.dir, this.cloud.layer.x);
+        this.$if(pb.and(pb.lessThan(this.tTop2.x, 0), pb.lessThan(this.tTop2.y, 0)), function () {
+          // Misses the layer: no shadow
+          emit(this, this.texel, pb.vec4(this.farDepthKm, 0, 0, 0));
+          this.$return();
+        });
+        this.$l.tMin = pb.float(0);
+        this.$l.tMax = pb.float(0);
+        this.$if(pb.greaterThan(pb.abs(pb.sub(this.tBottom2.x, this.tBottom2.y)), 0), function () {
+          this.$if(pb.not(pb.all(pb.greaterThan(this.tBottom2, pb.vec2(0)))), function () {
+            // Starts below the layer: nothing to trace
+            emit(this, this.texel, pb.vec4(0));
             this.$return();
           });
-          this.$l.tMin = pb.float(0);
-          this.$l.tMax = pb.float(0);
-          this.$if(pb.greaterThan(pb.abs(pb.sub(this.tBottom2.x, this.tBottom2.y)), 0), function () {
-            this.$if(pb.not(pb.all(pb.greaterThan(this.tBottom2, pb.vec2(0)))), function () {
-              // Starts below the layer: nothing to trace
-              pb.textureStore(this.dst, this.texel, pb.vec4(0));
-              this.$return();
-            });
-            this.$l.tempTop = pb.max(0, pb.min(this.tTop2.x, this.tTop2.y));
-            this.$l.tempBottom = pb.min(this.tBottom2.x, this.tBottom2.y);
-            this.tMin = pb.min(this.tempBottom, this.tempTop);
-            this.tMax = pb.max(this.tempBottom, this.tempTop);
-          }).$else(function () {
-            this.tMin = this.tTop2.x;
-            this.tMax = this.tTop2.y;
-          });
-          this.tMin = pb.max(this.tMin, 0);
-          this.tMax = pb.max(this.tMax, 0);
-          this.$l.layerPos = pb.add(this.nearPos, pb.mul(this.dir, this.tMin));
-          this.$l.length = pb.sub(this.tMax, this.tMin);
-          this.$l.sampleCount = this.lightDir.w;
-          this.$l.dt = pb.div(this.length, this.sampleCount);
-          // Distances here and in the map are relative to the near plane
-          this.$l.nearDepth = pb.mul(this.farDepthKm, 1000);
-          this.$l.extinctionAcc = pb.float(0);
-          this.$l.extinctionCount = pb.float(0);
-          this.$l.opticalDepth = pb.float(0);
-          // Sample midpoints, no jitter
-          this.$for(pb.int('i'), 0, pb.int(this.sampleCount), function () {
-            this.$l.sampleT = pb.mul(this.length, pb.div(pb.add(pb.float(this.i), 0.5), this.sampleCount));
-            this.$l.medium = cloudSampleDensity(
-              this,
-              this.cloud,
-              pb.add(this.layerPos, pb.mul(this.dir, this.sampleT)),
-              this.weatherMap,
-              this.baseNoise,
-              this.detailNoise,
-              'density',
-              CLOUD_SHADOW_EDGE_WIDTH
-            );
-            // Conservative density: skip empty space
-            this.$if(pb.lessThanEqual(this.medium.y, 0), function () {
-              this.$continue();
-            });
-            this.$l.extinction = this.medium.x;
-            this.$if(pb.greaterThan(this.extinction, 0), function () {
-              this.nearDepth = pb.min(this.nearDepth, this.sampleT);
-              this.extinctionCount = pb.add(this.extinctionCount, 1);
-            });
-            this.extinctionAcc = pb.add(this.extinctionAcc, this.extinction);
-            this.opticalDepth = pb.add(this.opticalDepth, pb.mul(this.extinction, this.dt));
-          });
-          this.$l.meanExtinction = pb.mul(
-            this.params.x,
-            pb.div(this.extinctionAcc, pb.max(1, this.extinctionCount))
-          );
-          this.$l.maxOpticalDepth = pb.mul(this.params.x, this.opticalDepth);
-          this.$l.frontDepthKm = pb.mul(
-            this.$choice(pb.equal(this.extinctionCount, 0), this.tMax, pb.add(this.tMin, this.nearDepth)),
-            0.001
-          );
-          pb.textureStore(
-            this.dst,
-            this.texel,
-            pb.vec4(
-              pb.max(0, pb.add(this.frontDepthKm, this.params.y)),
-              this.meanExtinction,
-              this.maxOpticalDepth,
-              0
-            )
-          );
+          this.$l.tempTop = pb.max(0, pb.min(this.tTop2.x, this.tTop2.y));
+          this.$l.tempBottom = pb.min(this.tBottom2.x, this.tBottom2.y);
+          this.tMin = pb.min(this.tempBottom, this.tempTop);
+          this.tMax = pb.max(this.tempBottom, this.tempTop);
+        }).$else(function () {
+          this.tMin = this.tTop2.x;
+          this.tMax = this.tTop2.y;
         });
+        this.tMin = pb.max(this.tMin, 0);
+        this.tMax = pb.max(this.tMax, 0);
+        this.$l.layerPos = pb.add(this.nearPos, pb.mul(this.dir, this.tMin));
+        this.$l.length = pb.sub(this.tMax, this.tMin);
+        this.$l.sampleCount = this.lightDir.w;
+        this.$l.dt = pb.div(this.length, this.sampleCount);
+        // Distances here and in the map are relative to the near plane
+        this.$l.nearDepth = pb.mul(this.farDepthKm, 1000);
+        this.$l.extinctionAcc = pb.float(0);
+        this.$l.extinctionCount = pb.float(0);
+        this.$l.opticalDepth = pb.float(0);
+        // Sample midpoints, no jitter
+        this.$for(pb.int('i'), 0, pb.int(this.sampleCount), function () {
+          this.$l.sampleT = pb.mul(this.length, pb.div(pb.add(pb.float(this.i), 0.5), this.sampleCount));
+          this.$l.medium = cloudSampleDensity(
+            this,
+            this.cloud,
+            pb.add(this.layerPos, pb.mul(this.dir, this.sampleT)),
+            this.weatherMap,
+            this.baseNoise,
+            this.detailNoise,
+            'density',
+            CLOUD_SHADOW_EDGE_WIDTH
+          );
+          // Conservative density: skip empty space
+          this.$if(pb.lessThanEqual(this.medium.y, 0), function () {
+            this.$continue();
+          });
+          this.$l.extinction = this.medium.x;
+          this.$if(pb.greaterThan(this.extinction, 0), function () {
+            this.nearDepth = pb.min(this.nearDepth, this.sampleT);
+            this.extinctionCount = pb.add(this.extinctionCount, 1);
+          });
+          this.extinctionAcc = pb.add(this.extinctionAcc, this.extinction);
+          this.opticalDepth = pb.add(this.opticalDepth, pb.mul(this.extinction, this.dt));
+        });
+        this.$l.meanExtinction = pb.mul(
+          this.params.x,
+          pb.div(this.extinctionAcc, pb.max(1, this.extinctionCount))
+        );
+        this.$l.maxOpticalDepth = pb.mul(this.params.x, this.opticalDepth);
+        this.$l.frontDepthKm = pb.mul(
+          this.$choice(pb.equal(this.extinctionCount, 0), this.tMax, pb.add(this.tMin, this.nearDepth)),
+          0.001
+        );
+        emit(
+          this,
+          this.texel,
+          pb.vec4(
+            pb.max(0, pb.add(this.frontDepthKm, this.params.y)),
+            this.meanExtinction,
+            this.maxOpticalDepth,
+            0
+          )
+        );
       }
-    })!;
+    });
   }
   return traceProgram;
 }
 
 function getFilterProgram() {
   if (!filterProgram) {
-    filterProgram = getDevice().buildComputeProgram({
+    filterProgram = buildTexelProgram({
       label: 'VolumetricCloudShadowFilter',
       workgroupSize: [8, 8, 1],
-      compute(pb) {
+      storage: (pb) => pb.texStorage2D.rgba16float().storage(0),
+      declare(pb) {
         this.src = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.size = pb.uint().uniform(0);
-        this.dst = pb.texStorage2D.rgba16float().storage(0);
-        pb.main(function () {
-          this.$if(
-            pb.or(
-              pb.greaterThanEqual(this.$builtins.globalInvocationId.x, this.size),
-              pb.greaterThanEqual(this.$builtins.globalInvocationId.y, this.size)
-            ),
-            function () {
-              this.$return();
-            }
-          );
-          this.$l.texel = this.$builtins.globalInvocationId.xy;
-          this.$l.p = pb.ivec2(pb.mul(this.texel, 2));
-          this.$l.d0 = pb.textureLoad(this.src, this.p, 0);
-          this.$l.d1 = pb.textureLoad(this.src, pb.add(this.p, pb.ivec2(1, 0)), 0);
-          this.$l.d2 = pb.textureLoad(this.src, pb.add(this.p, pb.ivec2(1, 1)), 0);
-          this.$l.d3 = pb.textureLoad(this.src, pb.add(this.p, pb.ivec2(0, 1)), 0);
-          // A plain 2x2 average of all channels, depth included
-          pb.textureStore(this.dst, this.texel, pb.mul(pb.add(this.d0, this.d1, this.d2, this.d3), 0.25));
-        });
+      },
+      main(pb, id, emit) {
+        this.$if(
+          pb.or(pb.greaterThanEqual(id.x, this.size), pb.greaterThanEqual(id.y, this.size)),
+          function () {
+            this.$return();
+          }
+        );
+        this.$l.texel = id.xy;
+        this.$l.p = pb.ivec2(pb.mul(this.texel, 2));
+        this.$l.d0 = pb.textureLoad(this.src, this.p, 0);
+        this.$l.d1 = pb.textureLoad(this.src, pb.add(this.p, pb.ivec2(1, 0)), 0);
+        this.$l.d2 = pb.textureLoad(this.src, pb.add(this.p, pb.ivec2(1, 1)), 0);
+        this.$l.d3 = pb.textureLoad(this.src, pb.add(this.p, pb.ivec2(0, 1)), 0);
+        // A plain 2x2 average of all channels, depth included
+        emit(this, this.texel, pb.mul(pb.add(this.d0, this.d1, this.d2, this.d3), 0.25));
       }
-    })!;
+    });
   }
   return filterProgram;
 }
@@ -235,12 +230,17 @@ function getFilterProgram() {
 export class VolumetricCloudShadowMap extends Disposable {
   private readonly _traceTexture: DRef<Texture2D>;
   private readonly _texture: DRef<Texture2D>;
+  /** Fragment path: render targets of the two textures */
+  private readonly _traceFramebuffer: DRef<FrameBuffer>;
+  private readonly _framebuffer: DRef<FrameBuffer>;
   private readonly _bindGroups: Map<GPUProgram, BindGroup>;
   private readonly _uniforms: CloudShadowUniforms;
   constructor() {
     super();
     this._traceTexture = new DRef();
     this._texture = new DRef();
+    this._traceFramebuffer = new DRef();
+    this._framebuffer = new DRef();
     this._bindGroups = new Map();
     this._uniforms = {
       rowU: new Vector4(),
@@ -336,19 +336,26 @@ export class VolumetricCloudShadowMap extends Disposable {
     // Their own samplers: the predefined ones leave the w axis clamped
     bindGroup.setTexture('baseNoise', resources.baseNoise);
     bindGroup.setTexture('detailNoise', resources.detailNoise);
-    bindGroup.setTexture('dst', this._traceTexture.get()!);
-    device.setProgram(trace);
-    device.setBindGroup(0, bindGroup);
-    device.compute(Math.ceil(traceRes / 8), Math.ceil(traceRes / 8), 1);
-    // One 2x2 downsample
+    // Then one 2x2 downsample
     const filter = getFilterProgram();
     const filterBindGroup = this._bindGroup(filter);
     filterBindGroup.setTexture('src', this._traceTexture.get()!, fetchSampler('clamp_nearest_nomip'));
     filterBindGroup.setValue('size', res);
-    filterBindGroup.setTexture('dst', this._texture.get()!);
-    device.setProgram(filter);
-    device.setBindGroup(0, filterBindGroup);
-    device.compute(Math.ceil(res / 8), Math.ceil(res / 8), 1);
+    if (cloudPassesUseCompute()) {
+      bindGroup.setTexture('dst', this._traceTexture.get()!);
+      device.setProgram(trace);
+      device.setBindGroup(0, bindGroup);
+      device.compute(Math.ceil(traceRes / 8), Math.ceil(traceRes / 8), 1);
+      filterBindGroup.setTexture('dst', this._texture.get()!);
+      device.setProgram(filter);
+      device.setBindGroup(0, filterBindGroup);
+      device.compute(Math.ceil(res / 8), Math.ceil(res / 8), 1);
+    } else {
+      device.pushDeviceStates();
+      drawTexelPass(trace, bindGroup, this._traceFramebuffer.get()!);
+      drawTexelPass(filter, filterBindGroup, this._framebuffer.get()!);
+      device.popDeviceStates();
+    }
 
     // World to map: planet = world * scale + (0, R, 0), relative to the near plane origin
     const base = new Vector3(-lightPos.x, R - lightPos.y, -lightPos.z);
@@ -385,6 +392,8 @@ export class VolumetricCloudShadowMap extends Disposable {
   }
   protected onDispose() {
     super.onDispose();
+    this._traceFramebuffer.dispose();
+    this._framebuffer.dispose();
     this._traceTexture.dispose();
     this._texture.dispose();
     for (const bindGroup of this._bindGroups.values()) {
@@ -394,22 +403,26 @@ export class VolumetricCloudShadowMap extends Disposable {
   }
   private _ensureTextures(traceRes: number, res: number) {
     const device = getDevice();
+    // Render targets where there are no storage textures
+    const compute = cloudPassesUseCompute();
     if (this._traceTexture.get()?.width !== traceRes) {
       const tex = device.createTexture2D('rgba16f', traceRes, traceRes, {
-        writable: true,
+        writable: compute,
         mipmapping: false
       })!;
       tex.name = 'VolumetricCloudShadowTrace';
       this._traceTexture.set(tex);
+      this._traceFramebuffer.set(compute ? null : device.createFrameBuffer([tex], null));
     }
     if (this._texture.get()?.width !== res) {
       const tex = device.createTexture2D('rgba16f', res, res, {
-        writable: true,
+        writable: compute,
         mipmapping: false,
         samplerOptions: { addressU: 'clamp', addressV: 'clamp', mipFilter: 'none' }
       })!;
       tex.name = 'VolumetricCloudShadowMap';
       this._texture.set(tex);
+      this._framebuffer.set(compute ? null : device.createFrameBuffer([tex], null));
     }
   }
   private _bindGroup(program: GPUProgram) {

@@ -147,4 +147,4 @@ sunLight.cloudShadowStrength = 1;
 
 云影被追踪到一张以相机为中心的云阴影图中，向每一侧覆盖两倍 `cloudShadowExtent` 大气米；范围越小，阴影越清晰，覆盖面积也越小。同一张图会压暗受光表面、天空与大气透视，以及 [DDGI](zh-cn/lighting-indirect.md#基于-sdf-的-ddgi) 的体素光照，因此云下的反弹光也会变暗。`cloudShadowOnSurfaceStrength` 和 `cloudShadowOnAtmosphereStrength`（0 到 1）分别调节这两部分效果，`cloudShadowMapResolutionScale` 和 `cloudShadowRaySampleCountScale` 在质量与开销之间取舍（分辨率缩放默认 0.5，让集成显卡也能负担追踪）。
 
-只有太阳光（`DirectionalLight.getSunLight(scene)`）会投射云阴影，且只在体积云模式下生效。云阴影目前仅支持 WebGPU：WebGL2 上会绘制体积云但不投射云影，并在控制台警告一次。
+只有太阳光（`DirectionalLight.getSunLight(scene)`）会投射云阴影，且只在体积云模式下生效。

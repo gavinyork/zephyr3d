@@ -139,4 +139,4 @@ sunLight.cloudShadowStrength = 1;
 
 The shadow is traced into a cloud shadow map centred on the camera, reaching twice `cloudShadowExtent` atmosphere metres to each side; a smaller extent gives sharper shadows over a smaller area. The same map darkens lit surfaces, the sky and aerial perspective, and the [DDGI](en/lighting-indirect.md#sdf-based-ddgi) voxel lighting, so the bounce light dims under a cloud too. `cloudShadowOnSurfaceStrength` and `cloudShadowOnAtmosphereStrength` (0 to 1) scale the two effects separately, and `cloudShadowMapResolutionScale` and `cloudShadowRaySampleCountScale` trade quality for cost (the default resolution scale of 0.5 keeps the trace affordable on integrated GPUs).
 
-Only the sun light (`DirectionalLight.getSunLight(scene)`) casts cloud shadows, and only in volumetric cloud mode. Cloud shadows are WebGPU-only for now: on WebGL2 the volumetric clouds are drawn but cast no shadow, and the console warns once.
+Only the sun light (`DirectionalLight.getSunLight(scene)`) casts cloud shadows, and only in volumetric cloud mode.

@@ -233,7 +233,6 @@ export class SkyRenderer extends Disposable {
   private _cloudDebugSlice: number;
   private _cloudDebugChannel: number;
   private static _volumetricFallbackWarned = false;
-  private static _cloudShadowWarned = false;
   private _debugAerialPerspective: number;
   private readonly _wind: Vector2;
   private readonly _skyboxRotation: Vector3;
@@ -779,10 +778,6 @@ export class SkyRenderer extends Disposable {
     const device = getDevice();
     return device.type === 'webgpu' || device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer;
   }
-  /** Whether the device can trace the volumetric cloud shadow map: WebGPU only for now. */
-  private static _cloudShadowSupported() {
-    return getDevice().type === 'webgpu';
-  }
   /** Parameters of the volumetric clouds. */
   get volumetricCloud(): VolumetricCloud {
     return this._volumetricCloud;
@@ -1097,7 +1092,6 @@ export class SkyRenderer extends Disposable {
     this._viewLUTsDeferred =
       useScatter &&
       this.effectiveCloudMode === 'volumetric' &&
-      SkyRenderer._cloudShadowSupported() &&
       !!sun?.castCloudShadows &&
       sun.cloudShadowStrength > 0 &&
       sun.cloudShadowOnAtmosphereStrength > 0;
@@ -1304,13 +1298,6 @@ export class SkyRenderer extends Disposable {
       sun.cloudShadowStrength <= 0 ||
       (sun.cloudShadowOnSurfaceStrength <= 0 && sun.cloudShadowOnAtmosphereStrength <= 0)
     ) {
-      return false;
-    }
-    if (!SkyRenderer._cloudShadowSupported()) {
-      if (!SkyRenderer._cloudShadowWarned) {
-        SkyRenderer._cloudShadowWarned = true;
-        console.warn('Volumetric cloud shadows require WebGPU, the sun is drawn without them');
-      }
       return false;
     }
     const ready = this._cloudShadowMap.update(
