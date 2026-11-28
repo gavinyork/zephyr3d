@@ -54,6 +54,11 @@
       "packageName": "@zephyr3d/scene",
       "comment": "Draw volumetric clouds on WebGL2, generating the noise volumes and tracing the sky cache and the cloud shadow map with full-screen draws where WebGPU uses compute.",
       "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Draw volumetric clouds by default in the scatter sky; scenes saved without a cloud mode still load with 2D clouds.",
+      "type": "minor"
     }
   ],
   "packageName": "@zephyr3d/scene"

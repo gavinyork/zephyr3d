@@ -47,6 +47,8 @@ export class PrimitiveEditor extends GraphEditor {
   initPreview(primitive: Primitive) {
     const scene = new Scene();
     scene.env.light.type = 'ibl';
+    // A preview needs no volumetric clouds of its own
+    scene.env.sky.cloudMode = 'procedural';
     const camera = new PerspectiveCamera(scene);
     camera.fovY = Math.PI / 3;
     const light = new DirectionalLight(scene);

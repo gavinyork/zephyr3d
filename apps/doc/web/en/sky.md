@@ -71,7 +71,7 @@ directional light created in a scene automatically becomes the sun**, so orienti
 
 ### Clouds
 
-The atmospheric sky supports two kinds of clouds, selected with `cloudMode`: the default `procedural` 2D clouds, and ray-marched `volumetric` clouds. Both are drawn only when `skyType = 'scatter'`; the skybox mode shows no clouds.
+The atmospheric sky supports two kinds of clouds, selected with `cloudMode`: the default ray-marched `volumetric` clouds, and cheaper `procedural` 2D clouds. Both are drawn only when `skyType = 'scatter'`; the skybox mode shows no clouds. Scenes saved before volumetric clouds became the default, which did not store a cloud mode, still load with 2D clouds.
 
 The buttons in the top-left corner of the example above switch between the two. Switching only takes a `cloudMode` change; read `effectiveCloudMode` back to get the mode actually drawn (a WebGL2 device that cannot render to half float textures falls back to 2D clouds, which is why the example disables the volumetric button there):
 

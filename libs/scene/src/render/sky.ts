@@ -307,7 +307,7 @@ export class SkyRenderer extends Disposable {
     this._heightFogParams = getDefaultHeightFogParams();
     this._cloudy = 0.45;
     this._cloudIntensity = 15;
-    this._cloudMode = 'procedural';
+    this._cloudMode = 'volumetric';
     this._volumetricCloud = new VolumetricCloud();
     this._volumetricCloudResources = new VolumetricCloudResources();
     this._volumetricCloudCache = new VolumetricCloudSkyCache();
@@ -741,7 +741,7 @@ export class SkyRenderer extends Disposable {
     }
   }
   /**
-   * How the clouds of the scatter sky are drawn.
+   * How the clouds of the scatter sky are drawn. Default `volumetric`.
    *
    * @remarks
    * `volumetric` needs half float render targets on WebGL2 (`EXT_color_buffer_half_float` or
