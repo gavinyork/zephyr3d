@@ -49,6 +49,11 @@
       "packageName": "@zephyr3d/scene",
       "comment": "Improve performance of the water foam field: step every level in one WebGPU dispatch, skip steps of no time, read the waves over each cell's footprint, read the shore field once per cell and step the coarser levels less often.",
       "type": "patch"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Draw volumetric clouds on WebGL2, generating the noise volumes and tracing the sky cache with full-screen draws where WebGPU uses compute; cloud shadow maps remain WebGPU-only.",
+      "type": "minor"
     }
   ],
   "packageName": "@zephyr3d/scene"
