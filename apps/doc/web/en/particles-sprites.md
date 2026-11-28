@@ -5,7 +5,7 @@ Zephyr3D provides two kinds of camera-facing quads:
 - `Sprite` renders a single camera-facing quad.
 - `ParticleEmitter` renders many quads with per-particle movement and lifetime, simulated on the CPU or the GPU.
 
-Use sprites for icons, markers, simple decals, and 2D elements in 3D space. Use particles for smoke, sparks, dust, fireflies, magic effects, and other repeated transient visuals. This page covers sprites, and what particles and sprites share: transparency sorting, picking and serialization. The parameters of particle emitters, CPU and GPU simulation, forces and collisions are covered in [Particle Emitter](en/particle-emitter.md), along with migrating from the deprecated `ParticleSystem`.
+Use sprites for icons, markers, simple decals, and 2D elements in 3D space. Use particles for smoke, sparks, dust, fireflies, magic effects, and other repeated transient visuals. This page covers sprites, and what particles and sprites share: transparency sorting, picking and serialization. The parameters of particle emitters, CPU and GPU simulation, forces and collisions are covered in [Particle Emitter](en/particle-emitter.md).
 
 > The code on this page is taken from the source of the runnable example `tut-90` below, which generates all of its textures in code.
 
@@ -103,7 +103,7 @@ Particles and sprites are drawable scene nodes and can be picked. A particle emi
 
 ## Serialization
 
-`Sprite`, `SpriteMaterial`, `StandardSpriteMaterial`, `ParticleEmitter`, and `ParticleSpriteMaterial` are registered with serialization. Editor-authored sprites and particle nodes can be saved in scenes or prefabs. The deprecated `ParticleSystem` and `ParticleMaterial` are still registered, so older scenes keep loading.
+`Sprite`, `SpriteMaterial`, `StandardSpriteMaterial`, `ParticleEmitter`, and `ParticleSpriteMaterial` are registered with serialization. Editor-authored sprites and particle nodes can be saved in scenes or prefabs.
 
 Textures used by sprite and particle materials should have asset ids before serialization. Textures generated in code, like the ones in the example, have no asset id and cannot be referenced from saved data.
 

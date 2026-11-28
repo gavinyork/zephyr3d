@@ -66,7 +66,7 @@ model.iterateBottomToTop((node) => { /* ... */ });
 
 Inside an `iterate()` callback it is common to discriminate node types with the type-guard methods,
 which also narrow the type for TypeScript: `isMesh()`, `isLight()`, `isCamera()`, `isSprite()`,
-`isParticleSystem()`, `isWater()`, `isBatchGroup()` and others.
+`isParticleEmitter()`, `isWater()`, `isBatchGroup()` and others.
 
 Immediate hierarchy is reachable through `parent`, `children`, `hasChild()` and `isParentOf()`.
 

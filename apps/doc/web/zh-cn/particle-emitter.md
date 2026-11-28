@@ -1,6 +1,6 @@
 # 粒子发射器
 
-`ParticleEmitter` 是用来做火花、烟、尘土、魔法光点这类效果的粒子节点。同一套参数既能在 CPU 上模拟，也能在 WebGPU 上用计算着色器模拟，几十万甚至上百万个粒子也能实时运行。它取代了旧的 `ParticleSystem`；旧类已弃用，迁移方法见[文末](#从-particlesystem-迁移)。
+`ParticleEmitter` 是用来做火花、烟、尘土、魔法光点这类效果的粒子节点。同一套参数既能在 CPU 上模拟，也能在 WebGPU 上用计算着色器模拟，几十万甚至上百万个粒子也能实时运行。
 
 > 本页代码引自下方可运行示例 `tut-95` 的源码。
 
@@ -220,28 +220,3 @@
 - **单个粒子读不回来。** 没有逐粒子回调，`aliveCount` 是上界；效果是否结束按时间判断（发射结束后再过最长寿命）。
 - **改 `maxParticles`、`space`、`simulation` 会清空现有粒子**，运行时切换会看到效果从头开始。
 - 每个 GPU 发射器每帧有一次单独的计算调度。几十个以上的大发射器同时存在时，优先合并成少量较大的发射器。
-
-## 从 ParticleSystem 迁移
-
-旧的 `ParticleSystem` 和 `ParticleMaterial` 已弃用：已有场景照常加载，只修 bug，不再增加功能。对应关系如下：
-
-| ParticleSystem | ParticleEmitter |
-| --- | --- |
-| `maxParticleCount` | `maxParticles` |
-| `emitInterval` + `emitCount` | `emission.rate`（= 1000 / `emitInterval` × `emitCount`） |
-| `newParticle(n, matrix)` | `emit(n)` |
-| `particleLifeMin` / `Max` | `start.lifetime` |
-| `particleVelocityMin` / `Max` | `start.speed` |
-| `particleSize1*` → `particleSize2*` | `start.size` 加 `overLife.size` 曲线 |
-| `particleRotationMin` / `Max`（角速度） | `start.angularVelocity`，另有初始角度 `start.rotation` |
-| `particleAccelMin` / `Max`（沿速度方向） | `forces.drag`（最常见的用途就是减速） |
-| `wind` + `airResistence` | `forces.airVelocity` + `forces.drag` |
-| `gravity` | `forces.gravity` |
-| `emitterShape` / `emitterBehavior` | `shape.type` / `shape.thickness`（没有 cylinder，可用 circle 或 cone） |
-| `scalar` | 节点缩放 |
-| `jitterSpeed` / `jitterPower` | 去掉，用 `forces.noise` |
-| `worldSpace` | `space` |
-| `material.alphaMap` | `material.texture` 加 `alphaFromRed` |
-| `material.rampMap` | `overLife.color`（也可以继续用贴图） |
-| `material.aspect` | `start.aspect` |
-| `material.directional` | `material.alignment = 'velocity'` 或 `'stretched'` |

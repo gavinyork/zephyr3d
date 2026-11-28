@@ -1,6 +1,6 @@
 # Particle Emitter
 
-`ParticleEmitter` is the particle node for sparks, smoke, dust, magic motes and the like. The same parameters simulate on the CPU or, on WebGPU, in a compute shader, which keeps hundreds of thousands or even millions of particles real-time. It replaces the old `ParticleSystem`, which is deprecated; see [the end of this page](#migrating-from-particlesystem) for migrating.
+`ParticleEmitter` is the particle node for sparks, smoke, dust, magic motes and the like. The same parameters simulate on the CPU or, on WebGPU, in a compute shader, which keeps hundreds of thousands or even millions of particles real-time.
 
 > The code on this page comes from the source of the runnable example `tut-95` below.
 
@@ -220,28 +220,3 @@ Pick **Particle Emitter** in the **Add** menu. The property grid follows the mod
 - **Particles cannot be read back one by one.** There are no per-particle callbacks, and `aliveCount` is an upper bound; an effect ends by time (the longest lifetime after emission stops).
 - **Changing `maxParticles`, `space` or `simulation` clears the particles alive**, so switching at run time restarts the effect.
 - Every GPU emitter costs a compute dispatch per frame. With dozens of large emitters, prefer fewer, larger ones.
-
-## Migrating from ParticleSystem
-
-The old `ParticleSystem` and `ParticleMaterial` are deprecated: existing scenes still load, and they get bug fixes only. The counterparts:
-
-| ParticleSystem | ParticleEmitter |
-| --- | --- |
-| `maxParticleCount` | `maxParticles` |
-| `emitInterval` + `emitCount` | `emission.rate` (= 1000 / `emitInterval` × `emitCount`) |
-| `newParticle(n, matrix)` | `emit(n)` |
-| `particleLifeMin` / `Max` | `start.lifetime` |
-| `particleVelocityMin` / `Max` | `start.speed` |
-| `particleSize1*` → `particleSize2*` | `start.size` and an `overLife.size` curve |
-| `particleRotationMin` / `Max` (angular velocity) | `start.angularVelocity`, plus a start angle `start.rotation` |
-| `particleAccelMin` / `Max` (along the velocity) | `forces.drag` (slowing down is what it was mostly used for) |
-| `wind` + `airResistence` | `forces.airVelocity` + `forces.drag` |
-| `gravity` | `forces.gravity` |
-| `emitterShape` / `emitterBehavior` | `shape.type` / `shape.thickness` (no cylinder; use circle or cone) |
-| `scalar` | The node's scale |
-| `jitterSpeed` / `jitterPower` | Removed; use `forces.noise` |
-| `worldSpace` | `space` |
-| `material.alphaMap` | `material.texture` with `alphaFromRed` |
-| `material.rampMap` | `overLife.color` (or keep using a texture) |
-| `material.aspect` | `start.aspect` |
-| `material.directional` | `material.alignment = 'velocity'` or `'stretched'` |

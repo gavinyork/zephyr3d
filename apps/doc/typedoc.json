@@ -1,6 +1,6 @@
 {
   "$schema": "https://typedoc.org/schema.json",
-  "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
+  "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme", "./typedoc-plugin-exclude-deprecated.mjs"],
   "entryPoints": [
     "../../libs/base/src/index.ts",
     "../../libs/device/src/index.ts",

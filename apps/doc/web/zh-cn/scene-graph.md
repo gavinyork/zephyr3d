@@ -63,7 +63,7 @@ model.iterateBottomToTop((node) => { /* ... */ });
 ```
 
 `iterate()` 的回调里常配合类型守卫方法来区分节点类型，它们同时起到 TypeScript 类型收窄的作用：
-`isMesh()`、`isLight()`、`isCamera()`、`isSprite()`、`isParticleSystem()`、`isWater()`、
+`isMesh()`、`isLight()`、`isCamera()`、`isSprite()`、`isParticleEmitter()`、`isWater()`、
 `isBatchGroup()` 等。
 
 直接的层级关系通过 `parent`、`children`、`hasChild()`、`isParentOf()` 访问。

@@ -5,7 +5,7 @@ Zephyr3D 提供两类面向摄像机的四边形：
 - `Sprite` 渲染单个始终面向摄像机的四边形。
 - `ParticleEmitter` 渲染大量带运动和生命周期的四边形，可以在 CPU 或 GPU 上模拟。
 
-Sprite 适合图标、标记、简单贴花和 3D 空间中的 2D 元素。粒子适合烟雾、火花、尘土、萤火、魔法效果等重复且短暂的视觉元素。本页讲 Sprite，以及粒子与 Sprite 共有的透明排序、拾取和序列化；粒子发射器的各组参数、CPU 与 GPU 模拟、力场和碰撞见[粒子发射器](zh-cn/particle-emitter.md)。旧的 `ParticleSystem` 已弃用，迁移方法也在那一页。
+Sprite 适合图标、标记、简单贴花和 3D 空间中的 2D 元素。粒子适合烟雾、火花、尘土、萤火、魔法效果等重复且短暂的视觉元素。本页讲 Sprite，以及粒子与 Sprite 共有的透明排序、拾取和序列化；粒子发射器的各组参数、CPU 与 GPU 模拟、力场和碰撞见[粒子发射器](zh-cn/particle-emitter.md)。
 
 > 本页代码引自下方可运行示例 `tut-90` 的源码，示例里的纹理全部在代码中生成。
 
@@ -101,7 +101,7 @@ Weighted blended OIT 在 WebGL2 和 WebGPU 上都可用，是粒子较多时最�
 
 ## 序列化
 
-`Sprite`、`SpriteMaterial`、`StandardSpriteMaterial`、`ParticleEmitter` 和 `ParticleSpriteMaterial` 都已注册到序列化系统。编辑器创建的 Sprite 和粒子节点可以保存在场景或预制体中。已弃用的 `ParticleSystem` 和 `ParticleMaterial` 仍然注册着，旧场景照常加载。
+`Sprite`、`SpriteMaterial`、`StandardSpriteMaterial`、`ParticleEmitter` 和 `ParticleSpriteMaterial` 都已注册到序列化系统。编辑器创建的 Sprite 和粒子节点可以保存在场景或预制体中。
 
 Sprite 和粒子材质使用的纹理，应在序列化前拥有 asset id。像示例这样在代码里生成的纹理没有 asset id，无法被保存引用。
 
